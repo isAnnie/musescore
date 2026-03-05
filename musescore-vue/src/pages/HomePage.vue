@@ -115,8 +115,22 @@ const createNewScore = () => {
 }
 
 const importScore = () => {
-  // 实现导入功能
-  console.log('导入乐谱')
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.musicxml,.xml,.mxl,.mid,.midi'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    try {
+      const importedScore = await scoreStore.importScoreFile(file)
+      router.push(`/editor/${importedScore.id}`)
+    } catch (error) {
+      console.error('导入失败:', error)
+      const message = error instanceof Error ? error.message : '导入文件时发生错误'
+      alert(`导入失败：${message}`)
+    }
+  }
+  input.click()
 }
 
 const openScore = (score: any) => {

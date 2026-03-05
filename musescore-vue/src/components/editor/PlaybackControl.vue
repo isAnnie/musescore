@@ -11,7 +11,7 @@
     <div class="progress-container">
       <input
         type="range"
-        v-model="localCurrentTime"
+        v-model.number="localCurrentTime"
         :max="safeTotalTime"
         step="0.1"
         @input="handleSeek"
@@ -68,7 +68,7 @@
       <!-- 速度滑块 -->
       <input
         type="range"
-        v-model="localTempo"
+        v-model.number="localTempo"
         min="40"
         max="200"
         @change="updateTempo"
@@ -164,7 +164,7 @@ watch(() => props.totalTime, (newTotalTime) => {
 })
 
 watch(() => props.tempo, (newTempo) => {
-  localTempo.value = newTempo
+  localTempo.value = Number(newTempo) || 120
 })
 
 // 播放控制方法
@@ -198,7 +198,9 @@ const handleSeek = () => {
 
 // 更新速度
 const updateTempo = () => {
-  emit('tempo-change', localTempo.value)
+  const nextTempo = Math.min(200, Math.max(40, Number(localTempo.value) || 120))
+  localTempo.value = nextTempo
+  emit('tempo-change', nextTempo)
 }
 
 // 速度调整

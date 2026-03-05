@@ -97,6 +97,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScoreStore } from '@/stores/scoreStore'
 import { useUserStore } from '@/stores/userStore'
+import { getScoreById, saveScoreOnServer } from '@/services/scoreApi'
 import FullScoreEditor from '@/components/editor/FullScoreEditor.vue'
 // import TemplateModal from '@/components/modals/TemplateModal.vue'
 // import ImportModal from '@/components/modals/ImportModal.vue'
@@ -174,9 +175,20 @@ const loadScore = async (id: string) => {
   error.value = null
   
   try {
-    // 在实际应用中，这里会调用API加载乐谱
-    // 这里我们模拟从store中加载
-    const score = scoreStore.scores.find(s => s.id === id)
+    let score = scoreStore.scores.find(s => s.id === id)
+    if (!score) {
+      try {
+        score = await getScoreById(id)
+        const existingIndex = scoreStore.scores.findIndex(item => item.id === score.id)
+        if (existingIndex === -1) {
+          scoreStore.scores.push(score)
+        } else {
+          scoreStore.scores[existingIndex] = score
+        }
+      } catch {
+        score = undefined
+      }
+    }
     
     if (score) {
       scoreStore.currentScore = score
@@ -340,17 +352,26 @@ const joinFestivalContest = () => {
 }
 
 // 保存处理
-const handleSave = () => {
-  if (currentScore.value) {
-    // 标记为已保存
+const handleSave = async () => {
+  if (!currentScore.value) return
+
+  try {
     currentScore.value.isDraft = false
+    currentScore.value.updatedAt = new Date()
+    const saved = await saveScoreOnServer(currentScore.value)
+    const scoreIndex = scoreStore.scores.findIndex(item => item.id === saved.id)
+    if (scoreIndex === -1) {
+      scoreStore.scores.push(saved)
+    } else {
+      scoreStore.scores[scoreIndex] = saved
+    }
+    scoreStore.currentScore = saved
     hasUnsavedChanges.value = false
-    
-    // 在实际应用中，这里会调用API保存到服务器
-    console.log('保存乐谱:', currentScore.value)
-    
-    // 显示保存成功提示
     showSaveSuccess()
+  } catch (err) {
+    console.error('保存乐谱失败:', err)
+    const message = err instanceof Error ? err.message : '保存乐谱失败'
+    error.value = message
   }
 }
 
@@ -415,8 +436,8 @@ const handleClose = () => {
 }
 
 // 确认保存
-const confirmSave = () => {
-  handleSave()
+const confirmSave = async () => {
+  await handleSave()
   showSavePrompt.value = false
   router.push('/')
 }

@@ -31,10 +31,10 @@
           <span>乐谱编辑器</span>
           <span v-if="draftCount > 0" class="badge">{{ draftCount }}</span>
         </router-link>
-        <!-- <router-link to="/my-scores" class="menu-item" :class="{ active: isActive('/my-scores') }">
+        <router-link to="/my-scores" class="menu-item" :class="{ active: isActive('/my-scores') }">
           <FileMusic class="w-5 h-5" />
           <span>我的乐谱</span>
-        </router-link> -->
+        </router-link>
         <!-- <router-link to="/arrangements" class="menu-item" :class="{ active: isActive('/arrangements') }">
           <Layers class="w-5 h-5" />
           <span>我的编曲</span>
@@ -198,6 +198,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useScoreStore } from '@/stores/scoreStore'
 import {
   User,
   Edit,
@@ -230,6 +231,7 @@ import {
 
 const router = useRouter()
 const userStore = useUserStore()
+const scoreStore = useScoreStore()
 
 // 主题状态
 const theme = ref<'light' | 'dark'>(localStorage.getItem('theme') as 'light' | 'dark' || 'light')
@@ -276,8 +278,22 @@ const createNewScore = () => {
 }
 
 const importScore = () => {
-  // 实现导入乐谱逻辑
-  console.log('导入乐谱')
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.musicxml,.xml,.mxl,.mid,.midi'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    try {
+      const importedScore = await scoreStore.importScoreFile(file)
+      router.push(`/editor/${importedScore.id}`)
+    } catch (error) {
+      console.error('导入失败:', error)
+      const message = error instanceof Error ? error.message : '导入文件时发生错误'
+      alert(`导入失败：${message}`)
+    }
+  }
+  input.click()
 }
 
 const printScore = () => {

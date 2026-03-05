@@ -27,20 +27,24 @@
               登录/注册
             </button>
             <div v-else class="flex items-center space-x-2">
-              <div class="relative group">
-                <button class="flex items-center space-x-2 hover:text-blue-300">
+              <div
+                class="relative user-dropdown-container"
+                @mouseenter="handleUserMenuMouseEnter"
+                @mouseleave="handleUserMenuMouseLeave"
+              >
+                <button class="flex items-center space-x-2 hover:text-blue-300" @click.stop="toggleUserMenu">
                   <User class="w-4 h-4" />
                   <span>{{ userStore.user?.username }}</span>
                   <ChevronDown class="w-3 h-3" />
                 </button>
-                <div class="user-dropdown">
-                  <router-link to="/profile" class="dropdown-item">
+                <div v-if="showUserMenu" class="user-dropdown">
+                  <router-link to="/profile" class="dropdown-item" @click="showUserMenu = false">
                     <User class="w-4 h-4" />个人资料
                   </router-link>
-                  <router-link to="/my-scores" class="dropdown-item">
+                  <router-link to="/my-scores" class="dropdown-item" @click="showUserMenu = false">
                     <Music class="w-4 h-4" />我的乐谱
                   </router-link>
-                  <router-link to="/settings" class="dropdown-item">
+                  <router-link to="/settings" class="dropdown-item" @click="showUserMenu = false">
                     <Settings class="w-4 h-4" />设置
                   </router-link>
                   <hr class="my-1">
@@ -109,7 +113,7 @@
             </router-link>
 
             <!-- 通知 -->
-            <div class="relative">
+            <div class="relative notifications-container">
               <button 
                 class="icon-btn"
                 @click="toggleNotifications"
@@ -150,12 +154,12 @@
             </div>
 
             <!-- 上传按钮 -->
-            <button class="icon-btn">
+            <button class="icon-btn" @click="importScore">
               <Upload class="w-5 h-5" />
             </button>
 
             <!-- 更多菜单 -->
-            <div class="relative">
+            <div class="relative more-menu-container">
               <button 
                 class="icon-btn"
                 @click="showMoreMenu = !showMoreMenu"
@@ -213,8 +217,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useScoreStore } from '@/stores/scoreStore'
 import LoginModal from '@/components/auth/LoginModal.vue'
 import {
   Moon,
@@ -238,8 +243,9 @@ import {
   MessageSquare
 } from 'lucide-vue-next'
 
-const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
+const scoreStore = useScoreStore()
 
 // 主题切换
 const theme = ref<'light' | 'dark'>('light')
@@ -258,6 +264,25 @@ const search = () => {
     console.log('搜索:', searchQuery.value)
     // 实际应用中这里会调用搜索API
   }
+}
+
+const importScore = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.musicxml,.xml,.mxl,.mid,.midi'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    try {
+      const importedScore = await scoreStore.importScoreFile(file)
+      router.push(`/editor/${importedScore.id}`)
+    } catch (error) {
+      console.error('导入失败:', error)
+      const message = error instanceof Error ? error.message : '导入文件时发生错误'
+      alert(`导入失败：${message}`)
+    }
+  }
+  input.click()
 }
 
 // 通知功能
@@ -283,6 +308,8 @@ const markAllAsRead = () => {
 
 // 更多菜单
 const showMoreMenu = ref(false)
+const showUserMenu = ref(false)
+let userMenuCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 // 登录模态框
 const showLoginModal = ref(false)
@@ -307,9 +334,36 @@ const searchSuggestionsData = [
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
   if (!target.closest('.user-dropdown-container')) {
+    showUserMenu.value = false
+  }
+  if (!target.closest('.more-menu-container')) {
     showMoreMenu.value = false
+  }
+  if (!target.closest('.notifications-container')) {
     showNotifications.value = false
   }
+}
+
+const toggleUserMenu = () => {
+  showUserMenu.value = !showUserMenu.value
+}
+
+const handleUserMenuMouseEnter = () => {
+  if (userMenuCloseTimer) {
+    clearTimeout(userMenuCloseTimer)
+    userMenuCloseTimer = null
+  }
+  showUserMenu.value = true
+}
+
+const handleUserMenuMouseLeave = () => {
+  if (userMenuCloseTimer) {
+    clearTimeout(userMenuCloseTimer)
+  }
+  userMenuCloseTimer = setTimeout(() => {
+    showUserMenu.value = false
+    userMenuCloseTimer = null
+  }, 140)
 }
 
 onMounted(() => {
@@ -325,6 +379,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  if (userMenuCloseTimer) {
+    clearTimeout(userMenuCloseTimer)
+    userMenuCloseTimer = null
+  }
 })
 
 // 搜索建议
@@ -492,12 +550,12 @@ const logout = () => {
 
 /* 用户下拉菜单 */
 .user-dropdown {
-  @apply absolute right-0 top-full mt-2 w-48 bg-white border 
+  @apply absolute right-0 top-full mt-0 w-48 bg-white border text-gray-700
          rounded-lg shadow-lg z-50 py-2;
 }
 
 .dropdown-item {
-  @apply flex items-center space-x-2 px-4 py-2 hover:bg-gray-50 
+  @apply flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50 
          transition-colors text-sm;
 }
 

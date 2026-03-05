@@ -60,7 +60,7 @@
         <label class="tempo-label">速度</label>
         <input
           type="range"
-          v-model="localTempo"
+          v-model.number="localTempo"
           min="40"
           max="200"
           @change="updateTempo"
@@ -160,6 +160,12 @@ const keySignatures = [
   'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'
 ]
 
+const toTempoNumber = (value: unknown) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 120
+  return Math.min(200, Math.max(40, parsed))
+}
+
 // 监听乐谱变化
 watch(() => props.score, (newScore) => {
   if (newScore) {
@@ -167,7 +173,7 @@ watch(() => props.score, (newScore) => {
     localComposer.value = newScore.composer
     localTimeSignature.value = newScore.timeSignature
     localKeySignature.value = newScore.keySignature
-    localTempo.value = newScore.tempo
+    localTempo.value = toTempoNumber(newScore.tempo)
   }
 }, { immediate: true })
 
@@ -206,7 +212,9 @@ const updateKeySignature = () => {
 // 更新速度
 const updateTempo = () => {
   if (props.score) {
-    props.score.tempo = localTempo.value
+    const nextTempo = toTempoNumber(localTempo.value)
+    localTempo.value = nextTempo
+    props.score.tempo = nextTempo
     emit('save')
   }
 }

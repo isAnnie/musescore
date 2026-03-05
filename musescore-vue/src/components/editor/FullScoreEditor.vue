@@ -146,6 +146,14 @@ let metronomeSynth: Tone.MembraneSynth | null = null
 let metronomeLoop: Tone.Loop | null = null
 let transport = Tone.Transport
 let playbackEndEventId: number | null = null
+let progressTimer: ReturnType<typeof setInterval> | null = null
+let hasPlaybackWarmedUp = false
+
+const normalizeTempo = (value: unknown) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 120
+  return Math.min(200, Math.max(40, parsed))
+}
 
 // 计算属性
 const currentScore = computed(() => scoreStore.currentScore)
@@ -613,6 +621,7 @@ const playScore = async () => {
     await Tone.start()
     initAudioComponents()
     await ensurePianoReady()
+    await prewarmSamplerForFirstPlayback()
     
     // 重置播放位置
     transport.stop()
@@ -631,9 +640,7 @@ const playScore = async () => {
     // 开始播放
     transport.start()
     isPlaying.value = true
-    
-    // 更新播放进度
-    updatePlaybackProgress()
+    startProgressTimer()
   } catch (error) {
     console.error('播放失败:', error)
   }
@@ -643,6 +650,7 @@ const playScore = async () => {
 const pausePlayback = () => {
   transport.pause()
   isPlaying.value = false
+  stopProgressTimer()
   ;(piano as any)?.releaseAll?.()
   
   if (metronomeLoop) {
@@ -656,6 +664,7 @@ const stopPlayback = () => {
   transport.position = 0
   clearPlaybackEndEvent()
   isPlaying.value = false
+  stopProgressTimer()
   playbackProgress.value = 0
   currentTime.value = 0
   ;(piano as any)?.releaseAll?.()
@@ -676,11 +685,12 @@ const seekPlayback = (time: number) => {
 
 // 更新速度
 const updateTempo = (newTempo: number) => {
-  tempo.value = newTempo
-  transport.bpm.value = newTempo
+  const nextTempo = normalizeTempo(newTempo)
+  tempo.value = nextTempo
+  transport.bpm.value = nextTempo
   
   if (currentScore.value) {
-    currentScore.value.tempo = newTempo
+    currentScore.value.tempo = nextTempo
   }
 }
 
@@ -764,10 +774,44 @@ const ensurePianoReady = async () => {
   pianoReady.value = true
 }
 
+const prewarmSamplerForFirstPlayback = async () => {
+  if (hasPlaybackWarmedUp || !piano) return
+
+  try {
+    const warmupAt = Tone.now() + 0.02
+    piano.triggerAttackRelease('C4', 0.02, warmupAt, 0.0001)
+    piano.triggerAttackRelease('C5', 0.02, warmupAt + 0.01, 0.0001)
+    await new Promise((resolve) => setTimeout(resolve, 60))
+  } catch (error) {
+    console.warn('预热采样失败，继续播放:', error)
+  } finally {
+    hasPlaybackWarmedUp = true
+  }
+}
+
 const clearPlaybackEndEvent = () => {
   if (playbackEndEventId === null) return
   transport.clear(playbackEndEventId)
   playbackEndEventId = null
+}
+
+const stopProgressTimer = () => {
+  if (!progressTimer) return
+  clearInterval(progressTimer)
+  progressTimer = null
+}
+
+const startProgressTimer = () => {
+  stopProgressTimer()
+  progressTimer = setInterval(() => {
+    if (!isPlaying.value) return
+    const elapsed = Number.isFinite(transport.seconds) ? transport.seconds : 0
+    const duration = totalTime.value > 0 ? totalTime.value : 0
+    const nextCurrentTime = duration > 0 ? Math.min(Math.max(0, elapsed), duration) : 0
+    const nextProgress = duration > 0 ? (nextCurrentTime / duration) * 100 : 0
+    currentTime.value = nextCurrentTime
+    playbackProgress.value = nextProgress
+  }, 50)
 }
 
 const schedulePlaybackEnd = (durationSeconds: number) => {
@@ -852,13 +896,9 @@ const scheduleNotesForPlayback = () => {
       transport.schedule((scheduledTime) => {
         if (!piano) return
         const velocity = (note.velocity ?? 82) / 127
-        piano.triggerAttack(note.pitch, scheduledTime, velocity)
+        const durationSeconds = Math.max(0.01, (effectiveEndBeat - noteStartBeat) * beatDuration)
+        piano.triggerAttackRelease(note.pitch, durationSeconds, scheduledTime, velocity)
       }, noteStartBeat * beatDuration)
-
-      transport.schedule((scheduledTime) => {
-        if (!piano) return
-        piano.triggerRelease(note.pitch, scheduledTime)
-      }, effectiveEndBeat * beatDuration)
     })
   })
   
@@ -888,24 +928,6 @@ const startMetronome = () => {
   }, '4n')
   
   metronomeLoop.start(0)
-}
-
-// 更新播放进度
-const updatePlaybackProgress = () => {
-  if (!isPlaying.value) return
-  
-  const update = () => {
-    const elapsed = Number.isFinite(transport.seconds) ? transport.seconds : 0
-    const duration = totalTime.value > 0 ? totalTime.value : 0
-    currentTime.value = duration > 0 ? Math.min(Math.max(0, elapsed), duration) : 0
-    playbackProgress.value = duration > 0 ? (currentTime.value / duration) * 100 : 0
-    
-    if (isPlaying.value) {
-      requestAnimationFrame(update)
-    }
-  }
-  
-  requestAnimationFrame(update)
 }
 
 // 音高计算
@@ -962,7 +984,7 @@ const loadScore = () => {
     const score = scoreStore.scores.find(s => s.id === scoreId)
     if (score) {
       scoreStore.currentScore = score
-      tempo.value = score.tempo
+      tempo.value = normalizeTempo(score.tempo)
     }
   } else {
     // 创建新乐谱
@@ -1064,13 +1086,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break
   }
 }
-
-// 监听乐谱变化
-watch(notes, () => {
-  if (isPlaying.value) {
-    scheduleNotesForPlayback()
-  }
-}, { deep: true })
 
 watch(
   () => [notes.value, currentScore.value?.timeSignature],
