@@ -33,12 +33,6 @@ build/
 # Java
 *.class
 
-############################
-# Spring Boot
-############################
-application-local.yml
-application-dev.yml
-application-prod.yml
 
 ############################
 # Node / Vue / Vite
@@ -66,25 +60,3 @@ vite.config.ts.timestamp*
 .env
 .env.*
 !.env.example
-
-############################
-# 前端构建缓存
-############################
-.cache/
-.temp/
-
-############################
-# 操作系统
-############################
-*.pid
-*.seed
-*.pid.lock
-
-############################
-# 打包文件
-############################
-*.jar
-*.war
-*.zip
-*.tar
-*.gz
