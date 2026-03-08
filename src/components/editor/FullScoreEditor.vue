@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="full-score-editor">
-    <!-- 缂栬緫鍣ㄥご閮?-->
+    <!-- 编辑器头部 -->
     <EditorHeader 
       :score="currentScore"
       @save="saveScore"
@@ -14,9 +14,9 @@
       :is-playing="isPlaying"
     />
 
-    <!-- 涓荤紪杈戝尯鍩?-->
+    <!-- 主编辑区域 -->
     <div class="editor-main">
-      <!-- 宸︿晶宸ュ叿闈㈡澘 -->
+      <!-- 左侧工具面板 -->
       <EditorToolbar 
         class="editor-toolbar-panel"
         :current-tool="currentTool"
@@ -35,7 +35,7 @@
         @tie-next="tieSelectedToNext"
       />
 
-      <!-- 涓ぎ涔愯氨鏄剧ず鍖哄煙 -->
+      <!-- 中央乐谱显示区域 -->
       <div class="score-display-area">
         <ScoreCanvas 
           ref="scoreCanvas"
@@ -54,7 +54,7 @@
         />
       </div>
 
-      <!-- 鍙充晶灞炴€ч潰鏉匡紙鎮诞锛屼笉鍙備笌涓诲竷灞€锛?-->
+      <!-- 右侧属性面板（悬浮，不参与主布局） -->
       <Transition name="properties-slide">
         <div v-if="selectedNote" class="properties-drawer">
           <EditorProperties 
@@ -67,7 +67,7 @@
       </Transition>
     </div>
 
-    <!-- 搴曢儴鐘舵€佹爮 -->
+    <!-- 底部状态栏 -->
     <EditorStatusBar 
       :zoom-level="zoomLevel"
       :current-position="currentPosition"
@@ -78,7 +78,7 @@
       @zoom-reset="zoomReset"
     />
 
-    <!-- 鎾斁鎺у埗娴姩闈㈡澘 -->
+    <!-- 播放控制浮动面板 -->
     <PlaybackControl 
       v-if="isPlaying"
       :current-time="currentTime"
@@ -102,7 +102,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { Note, Score, TimeSignature } from '@/types/score'
 import { ensureSharedPianoReady, getSharedPianoSampler, prewarmSharedPianoSampler } from '@/services/audioSampler'
 
-// 缁勪欢瀵煎叆
+// 组件导入
 import EditorHeader from './EditorHeader.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import ScoreCanvas from './ScoreCanvas.vue'
@@ -124,7 +124,7 @@ const emit = defineEmits<{
 
 const scoreStore = useScoreStore()
 
-// 缂栬緫鍣ㄧ姸鎬?
+// 编辑器状态
 const currentTool = ref<'select' | 'note' | 'rest' | 'chord' | 'eraser' | 'text'>('select')
 const selectedNoteType = ref<'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'>('quarter')
 const selectedAccidental = ref<'sharp' | 'flat' | 'natural' | null>(null)
@@ -137,7 +137,7 @@ const zoomLevel = ref(100)
 const staffTop = 40
 const timelineRowHeight = 150
 
-// 鎾斁鐘舵€?
+// 播放状态
 const isPlaying = ref(false)
 const metronomeActive = ref(false)
 const currentTime = ref(0)
@@ -145,7 +145,7 @@ const totalTime = ref(0)
 const tempo = ref(120)
 const currentPlaybackMeasureIndex = ref<number | null>(null)
 
-// 闊抽缁勪欢
+// 音频组件
 let piano: Tone.Sampler | null = null
 let metronomeSynth: Tone.MembraneSynth | null = null
 let metronomeLoop: Tone.Loop | null = null
@@ -160,7 +160,7 @@ const normalizeTempo = (value: unknown) => {
   return Math.min(200, Math.max(40, parsed))
 }
 
-// 璁＄畻灞炴€?
+// 计算属性
 const currentScore = computed(() => scoreStore.currentScore)
 const notes = computed(() => currentScore.value?.notes || [])
 
@@ -375,16 +375,16 @@ const canTieNext = computed(() => {
 })
 
 const currentPosition = computed(() => {
-  return { x: 0, y: 0 } // 鏍规嵁瀹為檯鍏夋爣浣嶇疆鏇存柊
+  return { x: 0, y: 0 } // 根据实际光标位置更新
 })
 
-// 宸ュ叿鍒囨崲
+// 工具切换
 const handleToolChange = (tool: any) => {
   currentTool.value = tool
-  selectedNoteId.value = null // 鍒囨崲宸ュ叿鏃跺彇娑堥€変腑
+  selectedNoteId.value = null // 切换工具时取消选中
 }
 
-// 闊崇鐐瑰嚮澶勭悊
+// 音符点击处理
 const handleNoteClick = (noteId: string) => {
   if (currentTool.value === 'select') {
     selectedNoteId.value = noteId
@@ -395,7 +395,7 @@ const handleNoteClick = (noteId: string) => {
   }
 }
 
-// 鐢诲竷鐐瑰嚮澶勭悊锛堟坊鍔犳柊闊崇锛?
+// 画布点击处理（添加新音符）
 const handleCanvasClick = (position: {
   x: number
   y: number
@@ -409,7 +409,7 @@ const handleCanvasClick = (position: {
   }
 }
 
-// 娣诲姞闊崇鍒版寚瀹氫綅缃?
+// 在指定位置添加音符
 const addNoteAtPosition = (position: {
   x: number
   y: number
@@ -443,7 +443,7 @@ const addNoteAtPosition = (position: {
     note.articulation = selectedArticulation.value
   }
 
-  // 濡傛灉鏄拰寮︽ā寮忥紝娣诲姞鍒板綋鍓嶉€変腑闊崇鐨勫拰寮︿腑
+  // 如果是和弦模式，添加到当前选中音符的和弦中
   if (currentTool.value === 'chord' && selectedNote.value && !selectedNote.value.isRest) {
     const chordNote = { ...note }
     chordNote.position.x = selectedNote.value.position.x
@@ -466,7 +466,7 @@ const addNoteAtPosition = (position: {
   }
 }
 
-// 闊崇绉诲姩澶勭悊
+// 音符移动处理
 const handleNoteMove = (
   noteId: string,
   newPosition: {
@@ -504,14 +504,14 @@ const handleNoteMove = (
   }
 }
 
-// 闊崇鎷栨嫿寮€濮?
+// 音符拖拽开始
 const handleNoteDragStart = (noteId: string) => {
-  console.log('鎷栨嫿寮€濮?', noteId)
+  console.log('拖拽开始:', noteId)
 }
 
-// 闊崇鎷栨嫿缁撴潫
+// 音符拖拽结束
 const handleNoteDragEnd = (noteId: string, finalPosition: { x: number; y: number }) => {
-  console.log('鎷栨嫿缁撴潫:', noteId, finalPosition)
+  console.log('拖拽结束:', noteId, finalPosition)
 }
 
 const tieSelectedToNext = () => {
@@ -531,7 +531,7 @@ const tieSelectedToNext = () => {
   scoreStore.updateNote(nextNote.id, { tieFromPrev: true })
 }
 
-// 鏇存柊閫変腑鐨勯煶绗?
+// 更新选中的音符
 const updateSelectedNote = (updates: Partial<Note>) => {
   if (!selectedNote.value) return
   
@@ -539,14 +539,14 @@ const updateSelectedNote = (updates: Partial<Note>) => {
   scoreStore.updateNote(selectedNote.value.id, updatedNote)
 }
 
-// 鍒犻櫎閫変腑鐨勯煶绗?
+// 删除选中的音符
 const deleteSelectedNote = () => {
   if (selectedNote.value) {
     deleteNote(selectedNote.value.id)
   }
 }
 
-// 鍒犻櫎闊崇
+// 删除音符
 const deleteNote = (noteId: string) => {
   const target = notes.value.find((note) => note.id === noteId)
   if (target && !target.isRest) {
@@ -581,7 +581,7 @@ const deleteNote = (noteId: string) => {
   }
 }
 
-// 淇濆瓨涔愯氨
+// 保存乐谱
 const saveScore = async () => {
   if (!currentScore.value) return
 
@@ -596,7 +596,7 @@ const publishScore = (payload: PublishPayload) => {
   emit('publish', payload)
 }
 
-// 瀵煎嚭涔愯氨
+// 导出乐谱
 const exportScore = (format: 'midi' | 'pdf' | 'musicxml') => {
   if (!currentScore.value) return
   emit('export', format)
@@ -615,21 +615,21 @@ const exportScore = (format: 'midi' | 'pdf' | 'musicxml') => {
 }
 
 const exportAsMIDI = () => {
-  // 浣跨敤绗笁鏂瑰簱濡?MIDI.js 鎴栬嚜宸辩殑瀹炵幇
+  // 使用第三方库（如 MIDI.js）或自定义实现
   console.log('导出为 MIDI')
 }
 
 const exportAsPDF = () => {
-  // 浣跨敤 html2pdf 鎴栫被浼煎簱
+  // 使用 html2pdf 或类似库
   console.log('导出为 PDF')
 }
 
 const exportAsMusicXML = () => {
-  // 鐢熸垚 MusicXML 鏍煎紡
+  // 生成 MusicXML 格式
   console.log('导出为 MusicXML')
 }
 
-// 鎾斁涔愯氨
+// 播放乐谱
 const playScore = async () => {
   if (isPlaying.value) {
     pausePlayback()
@@ -641,17 +641,17 @@ const playScore = async () => {
     await initAudioComponents()
     await prewarmSamplerForFirstPlayback()
     
-    // 閲嶇疆鎾斁浣嶇疆
+    // 重置播放位置
     transport.stop()
     transport.position = 0
     currentTime.value = 0
     currentPlaybackMeasureIndex.value = 0
     
-    // 瀹夋帓闊崇鎾斁
+    // 安排音符播放
     scheduleNotesForPlayback()
     if (totalTime.value <= 0) return
     
-    // 鍚姩鑺傛媿鍣?
+    // 启动节拍器
     if (metronomeActive.value) {
       startMetronome()
     }
@@ -665,7 +665,7 @@ const playScore = async () => {
   }
 }
 
-// 鏆傚仠鎾斁
+// 暂停播放
 const pausePlayback = () => {
   transport.pause()
   isPlaying.value = false
@@ -677,7 +677,7 @@ const pausePlayback = () => {
   }
 }
 
-// 鍋滄鎾斁
+// 停止播放
 const stopPlayback = () => {
   transport.stop()
   transport.position = 0
@@ -693,7 +693,7 @@ const stopPlayback = () => {
   }
 }
 
-// 璺宠浆鍒版寚瀹氭椂闂?
+// 跳转到指定时间
 const seekPlayback = (time: number) => {
   const maxTime = totalTime.value > 0 ? totalTime.value : 0
   const safeTime = Math.min(maxTime, Math.max(0, Number(time) || 0))
@@ -702,7 +702,7 @@ const seekPlayback = (time: number) => {
   currentPlaybackMeasureIndex.value = getCurrentMeasureIndexFromTransport()
 }
 
-// 鏇存柊閫熷害
+// 更新速度
 const updateTempo = (newTempo: number) => {
   const nextTempo = normalizeTempo(newTempo)
   tempo.value = nextTempo
@@ -716,7 +716,7 @@ const updateTempo = (newTempo: number) => {
   }
 }
 
-// 鍒囨崲鑺傛媿鍣?
+// 切换节拍器
 const toggleMetronome = () => {
   metronomeActive.value = !metronomeActive.value
   
@@ -727,7 +727,7 @@ const toggleMetronome = () => {
   }
 }
 
-// 鍒濆鍖栭煶棰戠粍浠?
+// 初始化音频组件
 const initAudioComponents = async () => {
   if (!piano) {
     piano = getSharedPianoSampler()
@@ -814,11 +814,11 @@ const schedulePlaybackEnd = (endTicks: number) => {
   }, `${endTicks}i`)
 }
 
-// 瀹夋帓闊崇鎾斁
+// 安排音符播放
 const scheduleNotesForPlayback = () => {
   if (!piano) return
   
-  // 娓呴櫎涔嬪墠鐨勫畨鎺?
+  // 清除之前的安排
   transport.cancel(0)
   clearPlaybackEndEvent()
   ;(piano as any).releaseAll?.()
@@ -935,7 +935,7 @@ const scheduleNotesForPlayback = () => {
   schedulePlaybackEnd(totalPlaybackTicks + getTicksForBeats(0.1))
 }
 
-// 鍚姩鑺傛媿鍣?
+// 启动节拍器
 const startMetronome = () => {
   if (!metronomeSynth) return
   
@@ -946,11 +946,11 @@ const startMetronome = () => {
   metronomeLoop = new Tone.Loop((time) => {
     const beat = Math.floor(transport.seconds / (60 / tempo.value))
     
-    // 寮烘媿
+    // 强拍
     if (beat % 4 === 0) {
       metronomeSynth?.triggerAttackRelease('C5', '32n', time, 0.8)
     } 
-    // 寮辨媿
+    // 弱拍
     else {
       metronomeSynth?.triggerAttackRelease('C4', '32n', time, 0.4)
     }
@@ -959,7 +959,7 @@ const startMetronome = () => {
   metronomeLoop.start(0)
 }
 
-// 闊抽珮璁＄畻
+// 音高计算
 const calculatePitchFromPosition = (y: number): string => {
   const staffTop = 40
   const rowHeight = 150
@@ -968,7 +968,7 @@ const calculatePitchFromPosition = (y: number): string => {
   const middleCPosition = staffTop + rowIndex * rowHeight + 50
   const positionFromMiddleC = Math.round((middleCPosition - y) / pitchStepY)
   
-  // 闊抽珮鏁扮粍
+  // 音高数组
   const pitches = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
   const octave = 4 + Math.floor(positionFromMiddleC / 7)
   const pitchIndex = (positionFromMiddleC % 7 + 7) % 7
@@ -976,7 +976,7 @@ const calculatePitchFromPosition = (y: number): string => {
   return `${pitches[pitchIndex]}${octave}`
 }
 
-// 鏍规嵁闊崇绫诲瀷鑾峰彇鏃堕暱
+// 根据音符类型获取时长
 const getDurationFromNoteType = (type: string, dotted = false): number => {
   const durations: Record<string, number> = {
     'whole': 4,
@@ -989,7 +989,7 @@ const getDurationFromNoteType = (type: string, dotted = false): number => {
   return dotted ? base * 1.5 : base
 }
 
-// 缂╂斁鎺у埗
+// 缩放控制
 const zoomIn = () => {
   if (zoomLevel.value < 200) {
     zoomLevel.value += 10
@@ -1006,7 +1006,7 @@ const zoomReset = () => {
   zoomLevel.value = 100
 }
 
-// 鐢熷懡鍛ㄦ湡
+// 生命周期
 onMounted(() => {
   if (currentScore.value) {
     tempo.value = normalizeTempo(currentScore.value.tempo)
@@ -1014,7 +1014,7 @@ onMounted(() => {
   }
   void initAudioComponents()
   
-  // 鐩戝惉閿洏蹇嵎閿?
+  // 监听键盘快捷键
   document.addEventListener('keydown', handleKeyDown)
 })
 
@@ -1034,9 +1034,9 @@ onUnmounted(() => {
   metronomeLoop = null
 })
 
-// 閿洏蹇嵎閿?
+// 键盘快捷键
 const handleKeyDown = (event: KeyboardEvent) => {
-  // 闃绘娴忚鍣ㄩ粯璁よ涓?
+  // 阻止浏览器默认行为
   if (event.ctrlKey || event.metaKey) {
     switch (event.key.toLowerCase()) {
       case 's':
@@ -1045,10 +1045,10 @@ const handleKeyDown = (event: KeyboardEvent) => {
         break
       case 'z':
         if (event.shiftKey) {
-          // Ctrl+Shift+Z 閲嶅仛
-          console.log('閲嶅仛')
+          // Ctrl+Shift+Z 重做
+          console.log('重做')
         } else {
-          // Ctrl+Z 鎾ら攢
+          // Ctrl+Z 撤销
           console.log('撤销')
         }
         event.preventDefault()
@@ -1060,7 +1060,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
     }
   }
   
-  // 宸ュ叿蹇嵎閿?
+  // 工具快捷键
   switch (event.key) {
     case '1':
       currentTool.value = 'select'

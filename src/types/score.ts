@@ -1,7 +1,7 @@
-export interface Note {
+﻿export interface Note {
   id: string
   type: 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
-  pitch: string // 如 'C4', 'D5'
+  pitch: string // 例如: 'C4', 'D5'
   duration: number
   position: { x: number; y: number }
   clef?: 'treble' | 'bass'
@@ -63,7 +63,7 @@ export interface User {
 export interface AudioEvent {
   time: number
   note: Note
-  synth: any // Tone.js合成器实例
+  synth: any // Tone.js 合成器实例
 }
 
 // 播放状态
@@ -94,3 +94,5 @@ export interface ShortcutMap {
     handler: () => void
   }
 }
+
+

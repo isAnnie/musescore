@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Accidental, Annotation, Beam, Dot, Formatter, Renderer, Stave, StaveConnector, StaveNote, StaveTie, Voice } from 'vexflow'
+import { Accidental, Annotation, Beam, Dot, Formatter, Renderer, Stave, StaveConnector, StaveNote, StaveTie, Stem, Voice } from 'vexflow'
 import type { Note, TimeSignature } from '@/types/score'
 
 const props = withDefaults(defineProps<{
@@ -178,18 +178,18 @@ const accidentalToSymbol = (accidental: Note['accidental']): string | null => {
 
 const getPreviewIcon = (note: Note): string => {
   if (note.isRest) {
-    return '饾劷'
+    return '𝄽'
   }
 
   const icons: Record<string, string> = {
-    whole: '饾厺',
-    half: '饾厼',
-    quarter: '饾厽',
-    eighth: '饾厾',
-    sixteenth: '饾叀'
+    whole: '𝅝',
+    half: '𝅗𝅥',
+    quarter: '♩',
+    eighth: '♪',
+    sixteenth: '♬'
   }
 
-  return icons[note.type] ?? '饾厽'
+  return icons[note.type] ?? '♩'
 }
 
 const getContainerPoint = (event: MouseEvent) => {
@@ -381,6 +381,18 @@ const getPlacementForNote = (note: Note, width: number): SnapPoint => {
 type TickableNote = Pick<Note, 'type' | 'isRest'> & { pitch: string; dots?: number; clef?: 'treble' | 'bass' }
 type NoteRenderRef = { staveNote: StaveNote; keyIndex: number }
 
+const resolveStemDirection = (staveNote: StaveNote) => {
+  const keyProps = staveNote.getKeyProps()
+  if (!keyProps.length) return Stem.UP
+  const averageLine = keyProps.reduce((sum, key) => sum + key.line, 0) / keyProps.length
+  return averageLine >= 3 ? Stem.DOWN : Stem.UP
+}
+
+const applyStemDirection = (note: Pick<Note, 'type' | 'isRest'>, staveNote: StaveNote) => {
+  if (note.isRest || note.type === 'whole') return
+  staveNote.setStemDirection(resolveStemDirection(staveNote))
+}
+
 const createVexNote = (note: Note | TickableNote) => {
   const clef = (note as Note).clef ?? 'treble'
   const staveNote = new StaveNote({
@@ -388,6 +400,7 @@ const createVexNote = (note: Note | TickableNote) => {
     keys: [note.isRest ? 'b/4' : normalizePitch(note.pitch)],
     duration: getVexDuration(note)
   })
+  applyStemDirection(note, staveNote)
 
   const fullNote = note as Note
 
@@ -435,6 +448,7 @@ const createVexChordNote = (chordNotes: Note[]) => {
     keys,
     duration: getVexDuration(headNote)
   })
+  applyStemDirection(headNote, staveNote)
 
   sorted.forEach((note, index) => {
     const symbol = accidentalToSymbol(note.accidental)
@@ -628,13 +642,16 @@ const drawScore = () => {
       .formatToStave([trebleVoiceData.voice], trebleStave)
       .formatToStave([bassVoiceData.voice], bassStave)
 
+    const trebleBeams = Beam.generateBeams(trebleVoiceData.vexNotes.filter((note) => !note.isRest?.()))
+    const bassBeams = Beam.generateBeams(bassVoiceData.vexNotes.filter((note) => !note.isRest?.()))
+
     trebleVoiceData.voice.draw(context, trebleStave)
     bassVoiceData.voice.draw(context, bassStave)
 
-    Beam.generateBeams(trebleVoiceData.vexNotes.filter((note) => !note.isRest?.())).forEach((beam) => {
+    trebleBeams.forEach((beam) => {
       beam.setContext(context).draw()
     })
-    Beam.generateBeams(bassVoiceData.vexNotes.filter((note) => !note.isRest?.())).forEach((beam) => {
+    bassBeams.forEach((beam) => {
       beam.setContext(context).draw()
     })
   }
