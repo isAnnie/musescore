@@ -1,5 +1,6 @@
 ﻿export interface Note {
   id: string
+  voice?: string
   type: 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
   pitch: string // 例如: 'C4', 'D5'
   duration: number

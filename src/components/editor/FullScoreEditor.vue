@@ -44,6 +44,7 @@
           :selected-note-id="selectedNoteId"
           :current-tool="currentTool"
           :time-signature="currentScore?.timeSignature"
+          :key-signature="currentScore?.keySignature"
           :zoom-level="zoomLevel"
           :beat-snap="beatSnap"
           :current-measure-index="currentPlaybackMeasureIndex"

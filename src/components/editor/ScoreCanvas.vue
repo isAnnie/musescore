@@ -52,11 +52,13 @@ const props = withDefaults(defineProps<{
   selectedNoteId: string | null
   currentTool: string
   timeSignature?: TimeSignature
+  keySignature?: string
   zoomLevel?: number
   beatSnap?: number
   currentMeasureIndex?: number | null
 }>(), {
   timeSignature: () => ({ numerator: 4, denominator: 4 }),
+  keySignature: 'C',
   zoomLevel: 100,
   beatSnap: 0.25,
   currentMeasureIndex: null
@@ -146,6 +148,28 @@ const getBeatsPerMeasure = () => {
   const denominator = props.timeSignature?.denominator ?? 4
   if (denominator <= 0) return 4
   return (numerator * 4) / denominator
+}
+
+const isSystemStartMeasure = (measureIndex: number) => measureIndex % measuresPerRow === 0
+
+const normalizeKeySignatureForVex = (raw: string | undefined) => {
+  const key = (raw ?? 'C').trim()
+  const valid = new Set([
+    'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#',
+    'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb',
+    'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m',
+    'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'
+  ])
+  return valid.has(key) ? key : 'C'
+}
+
+const applyStaveHeader = (stave: Stave, clef: 'treble' | 'bass', measureIndex: number) => {
+  if (!isSystemStartMeasure(measureIndex)) return
+  stave.addClef(clef).addKeySignature(normalizeKeySignatureForVex(props.keySignature))
+  if (measureIndex === 0) {
+    const tsText = `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`
+    stave.addTimeSignature(tsText)
+  }
 }
 
 const getVexDuration = (note: Pick<Note, 'type' | 'isRest'>): string => {
@@ -317,10 +341,7 @@ const snapPointToGrid = (point: { x: number; y: number }, width: number) => {
   const baseX = staffPadding.left + colIndex * staveWidth
   const staveY = clef === 'bass' ? bassY : trebleY
   const snapStave = new Stave(baseX, staveY, staveWidth - 8)
-  if (measureIndex === 0) {
-    const tsText = `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`
-    snapStave.addClef(clef).addTimeSignature(tsText).addKeySignature('C')
-  }
+  applyStaveHeader(snapStave, clef, measureIndex)
 
   const noteStartX = snapStave.getNoteStartX()
   const noteEndX = snapStave.getNoteEndX()
@@ -368,10 +389,7 @@ const getPlacementForNote = (note: Note, width: number): SnapPoint => {
   const baseX = staffPadding.left + colIndex * staveWidth
   const staveY = clef === 'bass' ? bassY : trebleY
   const stave = new Stave(baseX, staveY, staveWidth - 8)
-  if (measureIndex === 0) {
-    const tsText = `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`
-    stave.addClef(clef).addTimeSignature(tsText).addKeySignature('C')
-  }
+  applyStaveHeader(stave, clef, measureIndex)
 
   const noteStartX = stave.getNoteStartX()
   const noteEndX = stave.getNoteEndX()
@@ -562,13 +580,14 @@ const drawScore = () => {
   const beatsPerMeasure = getBeatsPerMeasure()
   const vexNoteById = new Map<string, NoteRenderRef>()
   const placementById = new Map<string, SnapPoint>()
-  const measureMap = new Map<number, Array<{ note: Note; beat: number; clef: 'treble' | 'bass' }>>()
+  const measureMap = new Map<number, Array<{ note: Note; beat: number; clef: 'treble' | 'bass'; voice: string }>>()
 
   placements.forEach(({ note, placement }) => {
     placementById.set(note.id, placement as SnapPoint)
     const list = measureMap.get(placement.measureIndex) ?? []
     const clef = note.clef ?? placement.clef
-    list.push({ note: { ...note, clef }, beat: placement.beat, clef })
+    const voice = note.voice?.trim() || '1'
+    list.push({ note: { ...note, clef, voice }, beat: placement.beat, clef, voice })
     measureMap.set(placement.measureIndex, list)
   })
 
@@ -580,11 +599,8 @@ const drawScore = () => {
     const trebleStave = new Stave(staveX, trebleY, staveWidth - 8)
     const bassStave = new Stave(staveX, bassY, staveWidth - 8)
 
-    if (measureIndex === 0) {
-      const tsText = `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`
-      trebleStave.addClef('treble').addTimeSignature(tsText).addKeySignature('C')
-      bassStave.addClef('bass').addTimeSignature(tsText).addKeySignature('C')
-    }
+    applyStaveHeader(trebleStave, 'treble', measureIndex)
+    applyStaveHeader(bassStave, 'bass', measureIndex)
 
     trebleStave.setContext(context).draw()
     bassStave.setContext(context).draw()
@@ -604,85 +620,113 @@ const drawScore = () => {
       return a.note.position.y - b.note.position.y
     })
 
-    const buildClefVoice = (clef: 'treble' | 'bass') => {
+    const buildClefVoiceData = (clef: 'treble' | 'bass') => {
       const clefItems = items.filter((item) => item.clef === clef)
-      const vexNotes: StaveNote[] = []
-      let cursorBeat = 0
-      let index = 0
+      const byVoice = new Map<string, Array<{ note: Note; beat: number }>>()
 
-      while (index < clefItems.length) {
-        const currentItem = clefItems[index]
-        const currentDuration = currentItem.note.duration || getDurationFromType(currentItem.note.type)
+      clefItems.forEach((item) => {
+        const voice = item.voice?.trim() || '1'
+        const list = byVoice.get(voice) ?? []
+        list.push({ note: item.note, beat: item.beat })
+        byVoice.set(voice, list)
+      })
 
-        if (currentItem.beat > cursorBeat + 0.001) {
-          makeRestTickables(currentItem.beat - cursorBeat, clef).forEach((rest) => {
+      if (byVoice.size === 0) {
+        byVoice.set('1', [])
+      }
+
+      const voices: Voice[] = []
+      const vexNotesAll: StaveNote[] = []
+
+      byVoice.forEach((voiceItems) => {
+        const sortedVoiceItems = [...voiceItems].sort((a, b) => {
+          const beatDiff = a.beat - b.beat
+          if (Math.abs(beatDiff) > 0.001) return beatDiff
+          return a.note.position.y - b.note.position.y
+        })
+
+        const vexNotes: StaveNote[] = []
+        let cursorBeat = 0
+        let index = 0
+
+        while (index < sortedVoiceItems.length) {
+          const currentItem = sortedVoiceItems[index]
+          const currentDuration = currentItem.note.duration || getDurationFromType(currentItem.note.type)
+
+          if (currentItem.beat > cursorBeat + 0.001) {
+            makeRestTickables(currentItem.beat - cursorBeat, clef).forEach((rest) => {
+              vexNotes.push(createVexNote(rest))
+            })
+            cursorBeat = currentItem.beat
+          }
+
+          if (currentItem.note.isRest) {
+            vexNotes.push(createVexNote({ ...currentItem.note, clef }))
+            cursorBeat = Math.max(cursorBeat, currentItem.beat + currentDuration)
+            index += 1
+            continue
+          }
+
+          const chordNotes: Note[] = [currentItem.note]
+          let nextIndex = index + 1
+          while (nextIndex < sortedVoiceItems.length) {
+            const nextItem = sortedVoiceItems[nextIndex]
+            const nextDuration = nextItem.note.duration || getDurationFromType(nextItem.note.type)
+            const sameBeat = Math.abs(nextItem.beat - currentItem.beat) <= 0.001
+            const sameDuration = Math.abs(nextDuration - currentDuration) <= 0.001
+            if (!sameBeat || !sameDuration || nextItem.note.isRest) break
+            chordNotes.push(nextItem.note)
+            nextIndex += 1
+          }
+
+          if (chordNotes.length > 1) {
+            const { staveNote, sortedNotes } = createVexChordNote(chordNotes)
+            vexNotes.push(staveNote)
+            sortedNotes.forEach((note, keyIndex) => {
+              vexNoteById.set(note.id, { staveNote, keyIndex })
+            })
+          } else {
+            const staveNote = createVexNote(chordNotes[0])
+            vexNotes.push(staveNote)
+            vexNoteById.set(chordNotes[0].id, { staveNote, keyIndex: 0 })
+          }
+
+          cursorBeat = Math.max(cursorBeat, currentItem.beat + currentDuration)
+          index = nextIndex
+        }
+
+        if (cursorBeat < beatsPerMeasure - 0.001) {
+          makeRestTickables(beatsPerMeasure - cursorBeat, clef).forEach((rest) => {
             vexNotes.push(createVexNote(rest))
           })
-          cursorBeat = currentItem.beat
         }
 
-        if (currentItem.note.isRest) {
-          vexNotes.push(createVexNote({ ...currentItem.note, clef }))
-          cursorBeat += currentDuration
-          index += 1
-          continue
-        }
+        const voice = new Voice({ num_beats: beatsPerMeasure, beat_value: 4 })
+        voice.setStrict(false)
+        voice.addTickables(vexNotes)
+        voices.push(voice)
+        vexNotesAll.push(...vexNotes)
+      })
 
-        const chordNotes: Note[] = [currentItem.note]
-        let nextIndex = index + 1
-        while (nextIndex < clefItems.length) {
-          const nextItem = clefItems[nextIndex]
-          const nextDuration = nextItem.note.duration || getDurationFromType(nextItem.note.type)
-          const sameBeat = Math.abs(nextItem.beat - currentItem.beat) <= 0.001
-          const sameDuration = Math.abs(nextDuration - currentDuration) <= 0.001
-          if (!sameBeat || !sameDuration || nextItem.note.isRest) break
-          chordNotes.push(nextItem.note)
-          nextIndex += 1
-        }
-
-        if (chordNotes.length > 1) {
-          const { staveNote, sortedNotes } = createVexChordNote(chordNotes)
-          vexNotes.push(staveNote)
-          sortedNotes.forEach((note, keyIndex) => {
-            vexNoteById.set(note.id, { staveNote, keyIndex })
-          })
-        } else {
-          const staveNote = createVexNote(chordNotes[0])
-          vexNotes.push(staveNote)
-          vexNoteById.set(chordNotes[0].id, { staveNote, keyIndex: 0 })
-        }
-
-        cursorBeat += currentDuration
-        index = nextIndex
-      }
-
-      if (cursorBeat < beatsPerMeasure - 0.001) {
-        makeRestTickables(beatsPerMeasure - cursorBeat, clef).forEach((rest) => {
-          vexNotes.push(createVexNote(rest))
-        })
-      }
-
-      const voice = new Voice({ num_beats: beatsPerMeasure, beat_value: 4 })
-      voice.setStrict(false)
-      voice.addTickables(vexNotes)
-
-      return { voice, vexNotes }
+      return { voices, vexNotesAll }
     }
 
-    const trebleVoiceData = buildClefVoice('treble')
-    const bassVoiceData = buildClefVoice('bass')
+    const trebleVoiceData = buildClefVoiceData('treble')
+    const bassVoiceData = buildClefVoiceData('bass')
 
-    new Formatter()
-      .joinVoices([trebleVoiceData.voice])
-      .joinVoices([bassVoiceData.voice])
-      .formatToStave([trebleVoiceData.voice], trebleStave)
-      .formatToStave([bassVoiceData.voice], bassStave)
+    const formatter = new Formatter()
+    formatter.joinVoices(trebleVoiceData.voices).formatToStave(trebleVoiceData.voices, trebleStave)
+    formatter.joinVoices(bassVoiceData.voices).formatToStave(bassVoiceData.voices, bassStave)
 
-    const trebleBeams = Beam.generateBeams(trebleVoiceData.vexNotes.filter((note) => !note.isRest?.()))
-    const bassBeams = Beam.generateBeams(bassVoiceData.vexNotes.filter((note) => !note.isRest?.()))
+    const trebleBeams = Beam.generateBeams(trebleVoiceData.vexNotesAll.filter((note) => !note.isRest?.()))
+    const bassBeams = Beam.generateBeams(bassVoiceData.vexNotesAll.filter((note) => !note.isRest?.()))
 
-    trebleVoiceData.voice.draw(context, trebleStave)
-    bassVoiceData.voice.draw(context, bassStave)
+    trebleVoiceData.voices.forEach((voice) => {
+      voice.draw(context, trebleStave)
+    })
+    bassVoiceData.voices.forEach((voice) => {
+      voice.draw(context, bassStave)
+    })
 
     trebleBeams.forEach((beam) => {
       beam.setContext(context).draw()
@@ -1090,6 +1134,7 @@ const noteRenderKey = computed(() => {
       note.type,
       Number((note.duration ?? 0).toFixed(3)),
       note.clef ?? 'treble',
+      note.voice ?? '1',
       typeof note.measureIndex === 'number' ? note.measureIndex : -1,
       typeof note.beatInMeasure === 'number' ? Number(note.beatInMeasure.toFixed(3)) : -1,
       note.isRest ? 1 : 0,
@@ -1128,6 +1173,10 @@ watch(
     requestDrawScore()
   }
 )
+
+watch(() => props.keySignature, () => {
+  requestDrawScore()
+})
 
 watch(() => props.currentTool, (newTool) => {
   if (newTool !== 'note' && newTool !== 'chord' && newTool !== 'rest') {

@@ -216,6 +216,24 @@ export const useScoreStore = defineStore('score', () => {
     return majorMap[fifths] ?? 'C'
   }
 
+  const getStepAccidentalFromKeyFifths = (step: string, fifths: number): Note['accidental'] => {
+    const upperStep = step.toUpperCase()
+    const sharpOrder = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
+    const flatOrder = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+
+    if (fifths > 0) {
+      const affected = new Set(sharpOrder.slice(0, Math.min(7, fifths)))
+      return affected.has(upperStep) ? 'sharp' : undefined
+    }
+
+    if (fifths < 0) {
+      const affected = new Set(flatOrder.slice(0, Math.min(7, Math.abs(fifths))))
+      return affected.has(upperStep) ? 'flat' : undefined
+    }
+
+    return undefined
+  }
+
   const createImportedScore = (base: {
     title: string
     tempo: number
@@ -320,6 +338,7 @@ export const useScoreStore = defineStore('score', () => {
     let tsNumerator = 4
     let tsDenominator = 4
     let keySignature = 'C'
+    let keyFifths = 0
     const measureCursors = new Map<string, number>()
     const lastStarts = new Map<string, number>()
 
@@ -346,6 +365,7 @@ export const useScoreStore = defineStore('score', () => {
         const fifthsText = attributes.querySelector('key > fifths')?.textContent
         const fifths = Number(fifthsText)
         if (!Number.isNaN(fifths)) {
+          keyFifths = fifths
           keySignature = parseKeySignature(fifths, attributes.querySelector('key > mode')?.textContent ?? null)
         }
       }
@@ -452,24 +472,50 @@ export const useScoreStore = defineStore('score', () => {
         const durationBeatsRaw = durationDiv > 0 ? durationDiv / Math.max(1, divisions) : 0
         const durationBeats = durationBeatsRaw > 0 ? durationBeatsRaw : 1
 
-        if (!isRest) {
+        const clef: 'treble' | 'bass' = staffNum === '2' ? 'bass' : 'treble'
+        const clampedBeat = Math.max(0, Math.min(startBeat, Math.max(0, beatsPerMeasure - 0.25)))
+        const pos = toEditorPosition(measureIndex, clampedBeat, beatsPerMeasure, clef)
+
+        if (isRest) {
+          notes.push({
+            id: `${Date.now()}-${measureIndex}-${startDiv}-${voice}-${notes.length}`,
+            type: durationToType(durationBeats),
+            pitch: 'B4',
+            duration: durationBeats,
+            position: {
+              x: pos.x,
+              y: pos.yBase + pos.middleCForClef
+            },
+            clef,
+            voice,
+            measureIndex,
+            beatInMeasure: clampedBeat,
+            isRest: true,
+            dots: child.querySelectorAll('dot').length || undefined
+          })
+        } else {
           const step = child.querySelector('pitch > step')?.textContent?.trim()?.toUpperCase()
           const octave = child.querySelector('pitch > octave')?.textContent?.trim()
           if (step && octave) {
             const alter = Number(child.querySelector('pitch > alter')?.textContent ?? '0')
-            const accidentalFromAlter: Note['accidental'] =
-              alter > 0 ? 'sharp' : alter < 0 ? 'flat' : undefined
             const accidentalTag = child.querySelector('accidental')?.textContent?.trim()
-            const accidental: Note['accidental'] =
+            const accidentalFromTag: Note['accidental'] =
               accidentalTag === 'sharp' ? 'sharp'
                 : accidentalTag === 'flat' ? 'flat'
                   : accidentalTag === 'natural' ? 'natural'
-                    : accidentalFromAlter
+                    : undefined
+            const accidentalFromAlter: Note['accidental'] =
+              alter > 0 ? 'sharp' : alter < 0 ? 'flat' : undefined
+            const keyAccidental = getStepAccidentalFromKeyFifths(step, keyFifths)
+            const accidental: Note['accidental'] = accidentalFromTag
+              ?? (() => {
+                if (!accidentalFromAlter) {
+                  return keyAccidental ? 'natural' : undefined
+                }
+                return accidentalFromAlter === keyAccidental ? undefined : accidentalFromAlter
+              })()
             const articulation = parseArticulationFromMusicXmlNote(child)
             const pitch = `${step}${alter > 0 ? '#' : alter < 0 ? 'b' : ''}${octave}`
-            const clef: 'treble' | 'bass' = staffNum === '2' ? 'bass' : 'treble'
-            const clampedBeat = Math.max(0, Math.min(startBeat, Math.max(0, beatsPerMeasure - 0.25)))
-            const pos = toEditorPosition(measureIndex, clampedBeat, beatsPerMeasure, clef)
             const stepFromMiddleC = pitchToStepFromMiddleC(pitch)
 
             notes.push({
@@ -482,6 +528,7 @@ export const useScoreStore = defineStore('score', () => {
                 y: pos.yBase + pos.middleCForClef - stepFromMiddleC * pos.pitchStepY
               },
               clef,
+              voice,
               measureIndex,
               beatInMeasure: clampedBeat,
               dots: child.querySelectorAll('dot').length || undefined,
