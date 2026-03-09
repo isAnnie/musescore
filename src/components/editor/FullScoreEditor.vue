@@ -26,6 +26,7 @@
         :dotted-note="dottedNote"
         :can-tie-next="canTieNext"
         :beat-snap="beatSnap"
+        :is-playing="isPlaying"
         @tool-change="handleToolChange"
         @note-type-change="selectedNoteType = $event"
         @accidental-change="selectedAccidental = $event"
@@ -128,7 +129,7 @@ const scoreStore = useScoreStore()
 const currentTool = ref<'select' | 'note' | 'rest' | 'chord' | 'eraser' | 'text'>('select')
 const selectedNoteType = ref<'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'>('quarter')
 const selectedAccidental = ref<'sharp' | 'flat' | 'natural' | null>(null)
-const selectedArticulation = ref<'staccato' | 'tenuto' | 'accent' | null>(null)
+const selectedArticulation = ref<'staccato' | 'tenuto' | 'accent' | 'tremolo' | null>(null)
 const dottedNote = ref(false)
 const beatSnap = ref(0.25)
 const selectedNoteId = ref<string | null>(null)
@@ -151,8 +152,9 @@ let metronomeSynth: Tone.MembraneSynth | null = null
 let metronomeLoop: Tone.Loop | null = null
 let transport = Tone.Transport
 let playbackEndEventId: number | null = null
-let progressAnimationFrame: number | null = null
+let progressTimer: ReturnType<typeof setInterval> | null = null
 let totalPlaybackTicks = 0
+const PROGRESS_UPDATE_INTERVAL_MS = 80
 
 const normalizeTempo = (value: unknown) => {
   const parsed = Number(value)
@@ -777,31 +779,29 @@ const getCurrentMeasureIndexFromTransport = () => {
 }
 
 const stopProgressTimer = () => {
-  if (progressAnimationFrame === null) return
-  cancelAnimationFrame(progressAnimationFrame)
-  progressAnimationFrame = null
+  if (progressTimer === null) return
+  clearInterval(progressTimer)
+  progressTimer = null
 }
 
 const startProgressTimer = () => {
   stopProgressTimer()
-  let lastFrameTime = 0
-  const frameIntervalMs = 33
-
-  const updateProgress = (timestamp: number) => {
+  const updateProgress = () => {
     if (!isPlaying.value) return
-    if (timestamp - lastFrameTime >= frameIntervalMs) {
-      lastFrameTime = timestamp
-      const elapsed = Number.isFinite(transport.seconds) ? transport.seconds : 0
-      const duration = totalTime.value > 0 ? totalTime.value : 0
-      const currentTicks = Math.max(0, Number.isFinite(transport.ticks) ? Number(transport.ticks) : 0)
-      const nextCurrentTime = duration > 0 ? Math.min(Math.max(0, elapsed), duration) : 0
+    const elapsed = Number.isFinite(transport.seconds) ? transport.seconds : 0
+    const duration = totalTime.value > 0 ? totalTime.value : 0
+    const nextCurrentTime = duration > 0 ? Math.min(Math.max(0, elapsed), duration) : 0
+    if (Math.abs(nextCurrentTime - currentTime.value) >= 0.02) {
       currentTime.value = nextCurrentTime
-      currentPlaybackMeasureIndex.value = getCurrentMeasureIndexFromTransport()
     }
-    progressAnimationFrame = requestAnimationFrame(updateProgress)
+    const nextMeasureIndex = getCurrentMeasureIndexFromTransport()
+    if (nextMeasureIndex !== currentPlaybackMeasureIndex.value) {
+      currentPlaybackMeasureIndex.value = nextMeasureIndex
+    }
   }
 
-  progressAnimationFrame = requestAnimationFrame(updateProgress)
+  updateProgress()
+  progressTimer = setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL_MS)
 }
 
 const schedulePlaybackEnd = (endTicks: number) => {
@@ -894,6 +894,13 @@ const scheduleNotesForPlayback = () => {
   }
 
   const playbackItemsByStartTicks = new Map<number, PlaybackItem[]>()
+  const addPlaybackItem = (startTicks: number, item: PlaybackItem) => {
+    const bucket = playbackItemsByStartTicks.get(startTicks) ?? []
+    bucket.push(item)
+    playbackItemsByStartTicks.set(startTicks, bucket)
+  }
+
+  const tremoloSliceBeat = 0.25
   let maxEndBeat = 0
   noteEvents.forEach(({ note, startBeat, endBeat }) => {
     let effectiveEndBeat = endBeat
@@ -909,16 +916,28 @@ const scheduleNotesForPlayback = () => {
     }
 
     maxEndBeat = Math.max(maxEndBeat, effectiveEndBeat)
-    const noteStartTicks = getTicksForBeats(startBeat)
-    const durationTicks = Math.max(1, getTicksForBeats(effectiveEndBeat - startBeat))
     const velocity = (note.velocity ?? 82) / 127
-    const bucket = playbackItemsByStartTicks.get(noteStartTicks) ?? []
-    bucket.push({
+    const finalDurationBeat = Math.max(0.001, effectiveEndBeat - startBeat)
+
+    if (note.articulation === 'tremolo') {
+      let cursor = startBeat
+      while (cursor < effectiveEndBeat - 0.0001) {
+        const segmentEnd = Math.min(effectiveEndBeat, cursor + tremoloSliceBeat)
+        addPlaybackItem(getTicksForBeats(cursor), {
+          pitch: note.pitch,
+          durationTicks: Math.max(1, getTicksForBeats(segmentEnd - cursor)),
+          velocity
+        })
+        cursor = segmentEnd
+      }
+      return
+    }
+
+    addPlaybackItem(getTicksForBeats(startBeat), {
       pitch: note.pitch,
-      durationTicks,
+      durationTicks: Math.max(1, getTicksForBeats(finalDurationBeat)),
       velocity
     })
-    playbackItemsByStartTicks.set(noteStartTicks, bucket)
   })
 
   playbackItemsByStartTicks.forEach((items, startTicks) => {
@@ -1057,6 +1076,24 @@ const handleKeyDown = (event: KeyboardEvent) => {
         event.preventDefault()
         playScore()
         break
+    }
+  }
+
+  if (isPlaying.value) {
+    switch (event.key) {
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '.':
+      case 't':
+      case 'T':
+      case 'Delete':
+      case 'Backspace':
+        event.preventDefault()
+        return
     }
   }
   

@@ -73,12 +73,16 @@ const emit = defineEmits([
 const container = ref<HTMLElement>()
 const vfHost = ref<HTMLDivElement>()
 let resizeObserver: ResizeObserver | null = null
+let drawRafId: number | null = null
 
 const previewNote = ref<Note | null>(null)
 const isDragging = ref(false)
 const dragNoteId = ref<string | null>(null)
 const showDebugLayer = ref(false)
 const renderedNotePoints = ref(new Map<string, { x: number; y: number; clef: 'treble' | 'bass' }>())
+const placementCacheById = ref(new Map<string, SnapPoint>())
+let mouseMoveRafId: number | null = null
+let pendingMouseMoveEvent: MouseEvent | null = null
 
 type SnapPoint = {
   x: number
@@ -204,6 +208,14 @@ const getContainerPoint = (event: MouseEvent) => {
     x: (event.clientX - rect.left) / scale,
     y: (event.clientY - rect.top) / scale
   }
+}
+
+const requestDrawScore = () => {
+  if (drawRafId !== null) return
+  drawRafId = requestAnimationFrame(() => {
+    drawRafId = null
+    drawScore()
+  })
 }
 
 const highlightedMeasureStyle = computed(() => {
@@ -393,6 +405,22 @@ const applyStemDirection = (note: Pick<Note, 'type' | 'isRest'>, staveNote: Stav
   staveNote.setStemDirection(resolveStemDirection(staveNote))
 }
 
+const addArticulationMark = (note: Pick<Note, 'isRest' | 'articulation'>, staveNote: StaveNote) => {
+  if (note.isRest || !note.articulation) return
+
+  const textByArticulation: Record<NonNullable<Note['articulation']>, string> = {
+    staccato: '.',
+    tenuto: '-',
+    accent: '>',
+    tremolo: 'tr'
+  }
+
+  const mark = new Annotation(textByArticulation[note.articulation])
+    .setFont('Arial', 11, note.articulation === 'tremolo' ? 'bold' : '')
+    .setVerticalJustification(Annotation.VerticalJustify.TOP)
+  staveNote.addModifier(mark, 0)
+}
+
 const createVexNote = (note: Note | TickableNote) => {
   const clef = (note as Note).clef ?? 'treble'
   const staveNote = new StaveNote({
@@ -433,6 +461,8 @@ const createVexNote = (note: Note | TickableNote) => {
   if (fullNote.id && fullNote.id === props.selectedNoteId) {
     staveNote.setStyle({ fillStyle: '#2563eb', strokeStyle: '#2563eb' })
   }
+
+  addArticulationMark(fullNote, staveNote)
 
   return staveNote
 }
@@ -480,6 +510,9 @@ const createVexChordNote = (chordNotes: Note[]) => {
     staveNote.setStyle({ fillStyle: '#2563eb', strokeStyle: '#2563eb' })
   }
 
+  const articulationCarrier = sorted.find((note) => note.articulation) ?? headNote
+  addArticulationMark(articulationCarrier, staveNote)
+
   return { staveNote, sortedNotes: sorted }
 }
 
@@ -510,6 +543,9 @@ const drawScore = () => {
 
   const width = Math.max(container.value.clientWidth, 900)
   const placements = props.notes.map((note) => ({ note, placement: getPlacementForNote(note, width) }))
+  placementCacheById.value = new Map(
+    placements.map(({ note, placement }) => [note.id, placement as SnapPoint])
+  )
   const maxMeasureIndex = placements.length ? Math.max(...placements.map((item) => item.placement.measureIndex)) : 0
   const measureCount = Math.max(1, maxMeasureIndex + 1)
   const rows = Math.max(1, Math.ceil(measureCount / measuresPerRow))
@@ -682,10 +718,10 @@ const drawScore = () => {
     if (!firstNote || !lastNote) return
 
     const tie = new StaveTie({
-      first_note: firstNote.staveNote,
-      last_note: lastNote.staveNote,
-      first_indices: [firstNote.keyIndex],
-      last_indices: [lastNote.keyIndex]
+      firstNote: firstNote.staveNote,
+      lastNote: lastNote.staveNote,
+      firstIndexes: [firstNote.keyIndex],
+      lastIndexes: [lastNote.keyIndex]
     })
 
     tie.setContext(context).draw()
@@ -790,6 +826,10 @@ const drawScore = () => {
 }
 
 const findNoteByPoint = (x: number, y: number, width: number) => {
+  const getCachedPlacement = (note: Note) => {
+    return placementCacheById.value.get(note.id) ?? getPlacementForNote(note, width)
+  }
+
   const renderedNearest = props.notes
     .map((note) => {
       const rendered = renderedNotePoints.value.get(note.id)
@@ -808,7 +848,7 @@ const findNoteByPoint = (x: number, y: number, width: number) => {
 
   const nearestVisual = props.notes
     .map((note) => {
-      const placement = getPlacementForNote(note, width)
+      const placement = getCachedPlacement(note)
       const clef = note.clef ?? placement.clef
       return {
         note,
@@ -829,7 +869,7 @@ const findNoteByPoint = (x: number, y: number, width: number) => {
 
   const candidates = props.notes
     .map((note) => {
-      const placement = getPlacementForNote(note, width)
+      const placement = getCachedPlacement(note)
       const clef = note.clef ?? placement.clef
       return {
         note,
@@ -908,7 +948,7 @@ const handleCanvasClick = (event: MouseEvent) => {
   })
 }
 
-const handleMouseMove = (event: MouseEvent) => {
+const processMouseMove = (event: MouseEvent) => {
   if (!container.value) return
 
   const point = getContainerPoint(event)
@@ -941,6 +981,18 @@ const handleMouseMove = (event: MouseEvent) => {
       isRest: props.currentTool === 'rest'
     }
   }
+}
+
+const handleMouseMove = (event: MouseEvent) => {
+  pendingMouseMoveEvent = event
+  if (mouseMoveRafId !== null) return
+  mouseMoveRafId = requestAnimationFrame(() => {
+    mouseMoveRafId = null
+    const latestEvent = pendingMouseMoveEvent
+    pendingMouseMoveEvent = null
+    if (!latestEvent) return
+    processMouseMove(latestEvent)
+  })
 }
 
 const handleMouseDown = (event: MouseEvent) => {
@@ -978,14 +1030,14 @@ const handleMouseUp = (event: MouseEvent) => {
 }
 
 const handleResize = () => {
-  drawScore()
+  requestDrawScore()
 }
 
 onMounted(() => {
   nextTick(() => {
-    drawScore()
+    requestDrawScore()
     requestAnimationFrame(() => {
-      drawScore()
+      requestDrawScore()
     })
 
     if (container.value) {
@@ -996,7 +1048,7 @@ onMounted(() => {
 
       if (typeof ResizeObserver !== 'undefined') {
         resizeObserver = new ResizeObserver(() => {
-          drawScore()
+          requestDrawScore()
         })
         resizeObserver.observe(container.value)
       }
@@ -1017,29 +1069,65 @@ onUnmounted(() => {
     resizeObserver.disconnect()
     resizeObserver = null
   }
+  if (drawRafId !== null) {
+    cancelAnimationFrame(drawRafId)
+    drawRafId = null
+  }
+  if (mouseMoveRafId !== null) {
+    cancelAnimationFrame(mouseMoveRafId)
+    mouseMoveRafId = null
+  }
+  pendingMouseMoveEvent = null
 
   window.removeEventListener('resize', handleResize)
 })
 
-watch(() => props.notes, () => {
-  drawScore()
-}, { deep: true })
+const noteRenderKey = computed(() => {
+  return props.notes.map((note) => (
+    [
+      note.id,
+      note.pitch,
+      note.type,
+      Number((note.duration ?? 0).toFixed(3)),
+      note.clef ?? 'treble',
+      typeof note.measureIndex === 'number' ? note.measureIndex : -1,
+      typeof note.beatInMeasure === 'number' ? Number(note.beatInMeasure.toFixed(3)) : -1,
+      note.isRest ? 1 : 0,
+      note.dots ?? 0,
+      note.accidental ?? '',
+      note.articulation ?? '',
+      note.tieToNext ? 1 : 0,
+      note.tieFromPrev ? 1 : 0,
+      note.pedalStart ? 1 : 0,
+      note.pedalEnd ? 1 : 0,
+      Number(note.position.x.toFixed(2)),
+      Number(note.position.y.toFixed(2))
+    ].join(':')
+  )).join('|')
+})
+
+watch(noteRenderKey, () => {
+  requestDrawScore()
+})
 
 watch(() => props.selectedNoteId, () => {
-  drawScore()
+  requestDrawScore()
 })
 
 watch(() => props.zoomLevel, () => {
-  drawScore()
+  requestDrawScore()
 })
 
 watch(() => props.beatSnap, () => {
-  drawScore()
+  requestDrawScore()
 })
 
-watch(() => props.timeSignature, () => {
-  drawScore()
-}, { deep: true })
+watch(
+  () => `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`,
+  () => {
+    requestDrawScore()
+  }
+)
 
 watch(() => props.currentTool, (newTool) => {
   if (newTool !== 'note' && newTool !== 'chord' && newTool !== 'rest') {

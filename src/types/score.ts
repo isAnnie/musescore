@@ -14,7 +14,7 @@
   pedalStart?: boolean
   pedalEnd?: boolean
   accidental?: 'sharp' | 'flat' | 'natural'
-  articulation?: 'staccato' | 'tenuto' | 'accent'
+  articulation?: 'staccato' | 'tenuto' | 'accent' | 'tremolo'
   selected?: boolean
   velocity?: number // MIDI力度 0-127
   channel?: number // MIDI通道 0-15

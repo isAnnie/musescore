@@ -1,5 +1,6 @@
 <template>
   <div class="editor-toolbar">
+    <fieldset class="toolbar-fieldset" :disabled="isPlaying">
     <!-- 工具选择 -->
     <div class="tool-section">
       <h4 class="section-title">工具</h4>
@@ -182,6 +183,7 @@
         </div>
       </div>
     </div>
+    </fieldset>
   </div>
 </template>
 
@@ -216,6 +218,7 @@ const props = defineProps<{
   dottedNote: boolean
   canTieNext: boolean
   beatSnap: number
+  isPlaying: boolean
 }>()
 
 // 工具状态
@@ -242,7 +245,8 @@ const accidentals = [
 const articulations = [
   { type: 'staccato', label: '断奏', symbol: '.' },
   { type: 'tenuto', label: '保持音', symbol: '–' },
-  { type: 'accent', label: '重音', symbol: '>' }
+  { type: 'accent', label: '重音', symbol: '>' },
+  { type: 'tremolo', label: '颤音', symbol: 'tr' }
 ]
 
 const snapOptions = [
@@ -295,6 +299,18 @@ const redo = () => {
 .editor-toolbar {
   @apply w-64 bg-white border-r p-4 space-y-6 overflow-y-auto;
   height: calc(100vh - 64px);
+}
+
+.toolbar-fieldset {
+  @apply space-y-6;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.toolbar-fieldset:disabled {
+  opacity: 0.55;
 }
 
 .tool-section {

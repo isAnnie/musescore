@@ -5,6 +5,8 @@ import type { Score, Note } from '@/types/score'
 
 export const useScoreStore = defineStore('score', () => {
   const STORAGE_KEY = 'musescore:score-store'
+  const FALLBACK_PERSIST_MAX_SCORES = 3
+  const FALLBACK_PERSIST_MAX_NOTES_FOR_CURRENT = 2500
 
   const getDefaultScores = (): Score[] => ([
     {
@@ -59,7 +61,51 @@ export const useScoreStore = defineStore('score', () => {
       scores: scores.value,
       currentScoreId: currentScore.value?.id ?? null
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+
+    const tryWrite = (raw: string) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, raw)
+        return true
+      } catch (error) {
+        const isQuotaExceeded = error instanceof DOMException
+          && (error.name === 'QuotaExceededError' || error.code === 22)
+        if (!isQuotaExceeded) {
+          console.error('持久化失败:', error)
+        }
+        return false
+      }
+    }
+
+    if (tryWrite(JSON.stringify(payload))) return
+
+    const currentId = currentScore.value?.id ?? null
+    const reducedScores = [...scores.value]
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, FALLBACK_PERSIST_MAX_SCORES)
+      .map((score) => {
+        if (score.id !== currentId) {
+          return { ...score, notes: [] as Note[], measures: [] }
+        }
+        if (score.notes.length <= FALLBACK_PERSIST_MAX_NOTES_FOR_CURRENT) {
+          return { ...score, measures: [] }
+        }
+        return {
+          ...score,
+          notes: score.notes.slice(-FALLBACK_PERSIST_MAX_NOTES_FOR_CURRENT),
+          measures: []
+        }
+      })
+
+    const reducedPayload = {
+      scores: reducedScores,
+      currentScoreId: currentId
+    }
+
+    if (!tryWrite(JSON.stringify(reducedPayload))) {
+      console.warn('本地存储空间不足，已跳过本次持久化。')
+    } else {
+      console.warn('本地存储空间不足，已使用降级持久化（仅保留最近乐谱）。')
+    }
   }
 
   const persisted = loadPersistedState()
@@ -192,6 +238,47 @@ export const useScoreStore = defineStore('score', () => {
       updatedAt: now,
       isDraft: true
     }
+  }
+
+  const parseArticulationFromMusicXmlNote = (noteEl: Element): Note['articulation'] => {
+    const ornaments = noteEl.querySelector('notations > ornaments')
+    if (!ornaments) {
+      if (noteEl.querySelector('notations > articulations > staccato')) {
+        return 'staccato'
+      }
+      if (noteEl.querySelector('notations > articulations > tenuto')) {
+        return 'tenuto'
+      }
+      if (noteEl.querySelector('notations > articulations > accent')) {
+        return 'accent'
+      }
+      return undefined
+    }
+
+    // MusicXML中的“颤音”常见写法：
+    // 1) ornaments/tremolo
+    // 2) ornaments/trill-mark
+    // 3) ornaments/wavy-line(type=start)
+    if (ornaments.querySelector('tremolo')) {
+      return 'tremolo'
+    }
+    if (ornaments.querySelector('trill-mark')) {
+      return 'tremolo'
+    }
+    const wavyLineStart = ornaments.querySelector('wavy-line[type=\"start\"], wavy-line:not([type])')
+    if (wavyLineStart) {
+      return 'tremolo'
+    }
+    if (noteEl.querySelector('notations > articulations > staccato')) {
+      return 'staccato'
+    }
+    if (noteEl.querySelector('notations > articulations > tenuto')) {
+      return 'tenuto'
+    }
+    if (noteEl.querySelector('notations > articulations > accent')) {
+      return 'accent'
+    }
+    return undefined
   }
 
   const parseMusicXMLContent = (xmlText: string, fallbackTitle: string): Score => {
@@ -378,6 +465,7 @@ export const useScoreStore = defineStore('score', () => {
                 : accidentalTag === 'flat' ? 'flat'
                   : accidentalTag === 'natural' ? 'natural'
                     : accidentalFromAlter
+            const articulation = parseArticulationFromMusicXmlNote(child)
             const pitch = `${step}${alter > 0 ? '#' : alter < 0 ? 'b' : ''}${octave}`
             const clef: 'treble' | 'bass' = staffNum === '2' ? 'bass' : 'treble'
             const clampedBeat = Math.max(0, Math.min(startBeat, Math.max(0, beatsPerMeasure - 0.25)))
@@ -399,7 +487,8 @@ export const useScoreStore = defineStore('score', () => {
               dots: child.querySelectorAll('dot').length || undefined,
               tieToNext: !!child.querySelector('tie[type="start"]'),
               tieFromPrev: !!child.querySelector('tie[type="stop"]'),
-              accidental
+              accidental,
+              articulation
             })
           }
         }

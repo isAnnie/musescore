@@ -273,7 +273,8 @@ const accidentals = [
 const articulations = [
   { value: 'staccato', label: '断奏', symbol: '•' },
   { value: 'tenuto', label: '保持音', symbol: '–' },
-  { value: 'accent', label: '重音', symbol: '>' }
+  { value: 'accent', label: '重音', symbol: '>' },
+  { value: 'tremolo', label: '颤音', symbol: 'tr' }
 ]
 
 // 检查键位是否激活
