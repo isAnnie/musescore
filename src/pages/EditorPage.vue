@@ -102,9 +102,34 @@ const error = ref<string | null>(null)
 const scoreKey = ref(Date.now())
 const hasUnsavedChanges = ref(false)
 const initialized = ref(false)
+const autoSaveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const savingInFlight = ref(false)
+const saveQueued = ref(false)
+const isSyncingFromServer = ref(false)
+const lastSavedFingerprint = ref<string | null>(null)
+
+const AUTO_SAVE_DELAY_MS = 1200
 
 const currentScore = computed(() => scoreStore.currentScore)
 const scoreId = computed(() => route.params.id as string | undefined)
+const currentScoreFingerprint = computed(() => {
+  if (!currentScore.value) return null
+  const score = currentScore.value
+  return JSON.stringify({
+    id: score.id,
+    title: score.title,
+    composer: score.composer,
+    tempo: score.tempo,
+    timeSignature: score.timeSignature,
+    keySignature: score.keySignature,
+    notes: score.notes,
+    measures: score.measures,
+    isDraft: score.isDraft,
+    tags: score.tags ?? [],
+    description: score.description ?? '',
+    visibility: score.visibility ?? 'private'
+  })
+})
 
 const showFestivalSection = computed(() => {
   const now = new Date()
@@ -121,6 +146,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearAutoSaveTimer()
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -131,17 +157,30 @@ watch(
       loadScore(newId)
       return
     }
+    clearAutoSaveTimer()
+    lastSavedFingerprint.value = null
+    hasUnsavedChanges.value = false
     scoreStore.currentScore = null
   }
 )
 
 watch(
-  () => currentScore.value,
-  () => {
+  () => currentScoreFingerprint.value,
+  (nextFingerprint) => {
+    if (!nextFingerprint) {
+      hasUnsavedChanges.value = false
+      return
+    }
     if (!initialized.value) return
-    hasUnsavedChanges.value = true
+    if (isSyncingFromServer.value) return
+
+    const isSaved = nextFingerprint === lastSavedFingerprint.value
+    hasUnsavedChanges.value = !isSaved
+    if (!isSaved) {
+      scheduleAutoSave()
+    }
   },
-  { deep: true }
+  { flush: 'post' }
 )
 
 const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -150,6 +189,27 @@ const handleBeforeUnload = (e: BeforeUnloadEvent) => {
   e.returnValue = '你有未保存的更改，确定要离开吗？'
 }
 
+const clearAutoSaveTimer = () => {
+  if (!autoSaveTimer.value) return
+  clearTimeout(autoSaveTimer.value)
+  autoSaveTimer.value = null
+}
+
+const scoreFingerprint = (score: Score) => JSON.stringify({
+  id: score.id,
+  title: score.title,
+  composer: score.composer,
+  tempo: score.tempo,
+  timeSignature: score.timeSignature,
+  keySignature: score.keySignature,
+  notes: score.notes,
+  measures: score.measures,
+  isDraft: score.isDraft,
+  tags: score.tags ?? [],
+  description: score.description ?? '',
+  visibility: score.visibility ?? 'private'
+})
+
 const syncSavedScore = (saved: Score) => {
   const index = scoreStore.scores.findIndex((item) => item.id === saved.id)
   if (index === -1) {
@@ -157,14 +217,64 @@ const syncSavedScore = (saved: Score) => {
   } else {
     scoreStore.scores[index] = saved
   }
-  scoreStore.currentScore = saved
-  hasUnsavedChanges.value = false
+
+  isSyncingFromServer.value = true
+  try {
+    scoreStore.currentScore = saved
+    lastSavedFingerprint.value = scoreFingerprint(saved)
+    hasUnsavedChanges.value = false
+  } finally {
+    isSyncingFromServer.value = false
+  }
+}
+
+const persistScore = async (options?: { showSuccessMessage?: string }) => {
+  if (!currentScore.value) return
+  if (!userStore.isLoggedIn) return
+
+  if (savingInFlight.value) {
+    saveQueued.value = true
+    return
+  }
+
+  savingInFlight.value = true
+  try {
+    if (typeof currentScore.value.isDraft !== 'boolean') {
+      currentScore.value.isDraft = true
+    }
+    currentScore.value.updatedAt = new Date()
+    const saved = await saveScoreOnServer(currentScore.value)
+    syncSavedScore(saved)
+    if (options?.showSuccessMessage) {
+      showSaveSuccess(options.showSuccessMessage)
+    }
+  } catch (err) {
+    console.error('保存乐谱失败:', err)
+    error.value = err instanceof Error ? err.message : '保存乐谱失败'
+  } finally {
+    savingInFlight.value = false
+    if (saveQueued.value) {
+      saveQueued.value = false
+      scheduleAutoSave(0)
+    }
+  }
+}
+
+const scheduleAutoSave = (delay = AUTO_SAVE_DELAY_MS) => {
+  if (!userStore.isLoggedIn) return
+  if (!hasUnsavedChanges.value) return
+  clearAutoSaveTimer()
+  autoSaveTimer.value = setTimeout(() => {
+    autoSaveTimer.value = null
+    void persistScore()
+  }, delay)
 }
 
 const loadScore = async (id: string) => {
   loading.value = true
   error.value = null
   initialized.value = false
+  clearAutoSaveTimer()
 
   try {
     let score = scoreStore.scores.find((item) => item.id === id)
@@ -173,6 +283,8 @@ const loadScore = async (id: string) => {
       syncSavedScore(score)
     } else {
       scoreStore.currentScore = score
+      lastSavedFingerprint.value = scoreFingerprint(score)
+      hasUnsavedChanges.value = false
     }
     scoreKey.value = Date.now()
   } catch (err) {
@@ -215,6 +327,8 @@ const createBlankScore = () => {
   const created = scoreStore.createScore(newScore)
   initialized.value = true
   hasUnsavedChanges.value = true
+  lastSavedFingerprint.value = null
+  scheduleAutoSave()
   navigateToScore(created.id)
 }
 
@@ -251,6 +365,8 @@ const importFromFile = () => {
       loading.value = true
       const imported = await scoreStore.importScoreFile(file)
       hasUnsavedChanges.value = true
+      lastSavedFingerprint.value = null
+      scheduleAutoSave()
       navigateToScore(imported.id)
     } catch (err) {
       console.error('导入失败:', err)
@@ -264,33 +380,21 @@ const importFromFile = () => {
 
 const handleSave = async () => {
   if (!currentScore.value) return
-
-  try {
-    if (typeof currentScore.value.isDraft !== 'boolean') {
-      currentScore.value.isDraft = true
-    }
-    currentScore.value.updatedAt = new Date()
-    const saved = await saveScoreOnServer(currentScore.value)
-    syncSavedScore(saved)
-    showSaveSuccess('保存成功')
-  } catch (err) {
-    console.error('保存乐谱失败:', err)
-    error.value = err instanceof Error ? err.message : '保存乐谱失败'
-  }
+  clearAutoSaveTimer()
+  await persistScore({ showSuccessMessage: '保存成功' })
 }
 
 const handlePublish = async (payload: PublishPayload) => {
   if (!currentScore.value) return
 
   try {
+    clearAutoSaveTimer()
     currentScore.value.isDraft = false
     currentScore.value.visibility = payload.visibility
     currentScore.value.description = payload.description
     currentScore.value.tags = payload.tags
     currentScore.value.updatedAt = new Date()
-    const saved = await saveScoreOnServer(currentScore.value)
-    syncSavedScore(saved)
-    showSaveSuccess('发布成功')
+    await persistScore({ showSuccessMessage: '发布成功' })
   } catch (err) {
     console.error('发布作品失败:', err)
     error.value = err instanceof Error ? err.message : '发布作品失败'
