@@ -22,7 +22,9 @@
         v-if="currentScore"
         :key="scoreKey"
         :score="currentScore"
+        :auto-save-enabled="autoSaveEnabled"
         @save="handleSave"
+        @toggle-auto-save="toggleAutoSave"
         @publish="handlePublish"
         @export="handleExport"
         @close="handleClose"
@@ -102,13 +104,19 @@ const error = ref<string | null>(null)
 const scoreKey = ref(Date.now())
 const hasUnsavedChanges = ref(false)
 const initialized = ref(false)
+const autoSaveEnabled = ref(localStorage.getItem('musescore:auto-save-enabled') !== 'false')
 const autoSaveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const savingInFlight = ref(false)
 const saveQueued = ref(false)
 const isSyncingFromServer = ref(false)
 const lastSavedFingerprint = ref<string | null>(null)
+const editorContextVersion = ref(0)
+const autoSaveLoginHintShown = ref(false)
 
 const AUTO_SAVE_DELAY_MS = 1200
+const LOGIN_HINT_COOLDOWN_MS = 2000
+const AUTO_SAVE_ENABLED_KEY = 'musescore:auto-save-enabled'
+let lastLoginHintAt = 0
 
 const currentScore = computed(() => scoreStore.currentScore)
 const scoreId = computed(() => route.params.id as string | undefined)
@@ -141,6 +149,8 @@ const showFestivalSection = computed(() => {
 onMounted(() => {
   if (scoreId.value) {
     loadScore(scoreId.value)
+  } else {
+    enterCreateMode()
   }
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
@@ -153,14 +163,21 @@ onBeforeUnmount(() => {
 watch(
   () => route.params.id,
   (newId) => {
+    editorContextVersion.value += 1
     if (typeof newId === 'string' && newId.length > 0) {
       loadScore(newId)
       return
     }
-    clearAutoSaveTimer()
-    lastSavedFingerprint.value = null
-    hasUnsavedChanges.value = false
-    scoreStore.currentScore = null
+    enterCreateMode()
+  }
+)
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      autoSaveLoginHintShown.value = false
+    }
   }
 )
 
@@ -195,6 +212,30 @@ const clearAutoSaveTimer = () => {
   autoSaveTimer.value = null
 }
 
+const enterCreateMode = () => {
+  clearAutoSaveTimer()
+  lastSavedFingerprint.value = null
+  hasUnsavedChanges.value = false
+  error.value = null
+  scoreStore.currentScore = null
+}
+
+const showLoginRequiredHint = (scene: 'manual' | 'auto') => {
+  const now = Date.now()
+  if (now - lastLoginHintAt < LOGIN_HINT_COOLDOWN_MS) {
+    return
+  }
+  lastLoginHintAt = now
+  if (scene === 'manual') {
+    alert('请先登录后再保存乐谱')
+    return
+  }
+  if (!autoSaveLoginHintShown.value) {
+    autoSaveLoginHintShown.value = true
+    alert('请先登录后再自动保存乐谱')
+  }
+}
+
 const scoreFingerprint = (score: Score) => JSON.stringify({
   id: score.id,
   title: score.title,
@@ -210,14 +251,17 @@ const scoreFingerprint = (score: Score) => JSON.stringify({
   visibility: score.visibility ?? 'private'
 })
 
-const syncSavedScore = (saved: Score) => {
+const upsertSavedScore = (saved: Score) => {
   const index = scoreStore.scores.findIndex((item) => item.id === saved.id)
   if (index === -1) {
     scoreStore.scores.push(saved)
   } else {
     scoreStore.scores[index] = saved
   }
+}
 
+const syncSavedScore = (saved: Score) => {
+  upsertSavedScore(saved)
   isSyncingFromServer.value = true
   try {
     scoreStore.currentScore = saved
@@ -231,6 +275,7 @@ const syncSavedScore = (saved: Score) => {
 const persistScore = async (options?: { showSuccessMessage?: string }) => {
   if (!currentScore.value) return
   if (!userStore.isLoggedIn) return
+  const persistContextVersion = editorContextVersion.value
 
   if (savingInFlight.value) {
     saveQueued.value = true
@@ -244,6 +289,11 @@ const persistScore = async (options?: { showSuccessMessage?: string }) => {
     }
     currentScore.value.updatedAt = new Date()
     const saved = await saveScoreOnServer(currentScore.value)
+    if (persistContextVersion !== editorContextVersion.value) {
+      // Route/context changed while saving; don't write stale payload into current editor.
+      upsertSavedScore(saved)
+      return
+    }
     syncSavedScore(saved)
     if (options?.showSuccessMessage) {
       showSaveSuccess(options.showSuccessMessage)
@@ -261,7 +311,11 @@ const persistScore = async (options?: { showSuccessMessage?: string }) => {
 }
 
 const scheduleAutoSave = (delay = AUTO_SAVE_DELAY_MS) => {
-  if (!userStore.isLoggedIn) return
+  if (!autoSaveEnabled.value) return
+  if (!userStore.isLoggedIn) {
+    showLoginRequiredHint('auto')
+    return
+  }
   if (!hasUnsavedChanges.value) return
   clearAutoSaveTimer()
   autoSaveTimer.value = setTimeout(() => {
@@ -380,8 +434,26 @@ const importFromFile = () => {
 
 const handleSave = async () => {
   if (!currentScore.value) return
+  if (!userStore.isLoggedIn) {
+    showLoginRequiredHint('manual')
+    return
+  }
   clearAutoSaveTimer()
   await persistScore({ showSuccessMessage: '保存成功' })
+}
+
+const toggleAutoSave = () => {
+  autoSaveEnabled.value = !autoSaveEnabled.value
+  localStorage.setItem(AUTO_SAVE_ENABLED_KEY, String(autoSaveEnabled.value))
+  if (!autoSaveEnabled.value) {
+    clearAutoSaveTimer()
+    showSaveSuccess('自动保存已关闭')
+    return
+  }
+  showSaveSuccess('自动保存已开启')
+  if (hasUnsavedChanges.value) {
+    scheduleAutoSave()
+  }
 }
 
 const handlePublish = async (payload: PublishPayload) => {

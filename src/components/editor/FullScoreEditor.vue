@@ -3,7 +3,9 @@
     <!-- 编辑器头部 -->
     <EditorHeader 
       :score="currentScore"
+      :auto-save-enabled="props.autoSaveEnabled"
       @save="saveScore"
+      @toggle-auto-save="handleToggleAutoSave"
       @publish="publishScore"
       @export="exportScore"
       @play="playScore"
@@ -120,9 +122,19 @@ type PublishPayload = {
 
 const emit = defineEmits<{
   save: []
+  'toggle-auto-save': []
   publish: [payload: PublishPayload]
   export: [format: 'midi' | 'pdf' | 'musicxml']
 }>()
+const props = withDefaults(defineProps<{
+  autoSaveEnabled?: boolean
+}>(), {
+  autoSaveEnabled: true
+})
+
+const handleToggleAutoSave = () => {
+  emit('toggle-auto-save')
+}
 
 const scoreStore = useScoreStore()
 
@@ -707,6 +719,9 @@ const seekPlayback = (time: number) => {
 
 // 更新速度
 const updateTempo = (newTempo: number) => {
+  if (isPlaying.value) {
+    return
+  }
   const nextTempo = normalizeTempo(newTempo)
   tempo.value = nextTempo
   transport.bpm.value = nextTempo

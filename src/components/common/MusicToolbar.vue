@@ -67,9 +67,9 @@ const emit = defineEmits(['note-selected', 'pitch-selected'])
 const noteTypes = [
   { type: 'whole', label: '全音符', icon: '𝅝' },
   { type: 'half', label: '二分音符', icon: '𝅗𝅥' },
-  { type: 'quarter', label: '四分音符', icon: '𝅘𝅥' },
-  { type: 'eighth', label: '八分音符', icon: '𝅘𝅥𝅮' },
-  { type: 'sixteenth', label: '十六分音符', icon: '𝅘𝅥𝅯' }
+  { type: 'quarter', label: '四分音符', icon: '♩' },
+  { type: 'eighth', label: '八分音符', icon: '♪' },
+  { type: 'sixteenth', label: '十六分音符', icon: '♬' }
 ]
 
 // 钢琴键盘配置
@@ -88,7 +88,7 @@ const pianoKeys = [
   { note: 'B4', label: 'B', class: 'white-key' }
 ]
 
-// 状态
+// ״̬
 const selectedNote = ref('quarter')
 const currentPitch = ref('C4')
 const currentDuration = ref(1)

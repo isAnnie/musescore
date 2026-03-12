@@ -10,14 +10,14 @@
 
       <!-- 音符计数 -->
       <div class="stat-item" v-if="noteCount > 0">
-        <span class="stat-icon">🎵</span>
+        <span class="stat-icon">♪</span>
         <span class="stat-value">{{ noteCount }}</span>
         <span class="stat-label">音符</span>
       </div>
 
       <!-- 总时长 -->
       <div class="stat-item">
-        <span class="stat-icon">⏱️</span>
+        <span class="stat-icon">⏱</span>
         <span class="stat-value">{{ formatDuration(totalDuration) }}</span>
         <span class="stat-label">总时长</span>
       </div>
@@ -117,13 +117,13 @@ const lastSaveTime = ref('刚刚')
 // 工具映射
 const toolIcons = {
   select: '↖️',
-  note: '🎵',
-  rest: '🎵',
-  chord: '🎶',
-  eraser: '🧹',
-  text: '🔤',
-  measure: '📏',
-  clef: '🎼'
+  note: '♪',
+  rest: '𝄽',
+  chord: '♫',
+  eraser: '⌫',
+  text: 'T',
+  measure: '|',
+  clef: '𝄞'
 }
 
 const toolNames = {
@@ -139,7 +139,7 @@ const toolNames = {
 
 // 获取当前工具图标和名称
 const getToolIcon = computed(() => {
-  return '🎵' // 这里应该从编辑器状态获取
+  return '♪' // 这里应该从编辑器状态获取
 })
 
 const toolName = computed(() => {

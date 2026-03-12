@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     ref="container"
     class="score-canvas-container"

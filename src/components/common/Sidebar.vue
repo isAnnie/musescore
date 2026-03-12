@@ -114,11 +114,11 @@
           <h3 class="festival-title">新春特辑</h3>
         </div>
         <router-link to="/festival/music" class="menu-item festival-item">
-          <div class="festival-icon">🐎</div>
+          <div class="festival-icon">🧧</div>
           <span>马年主题音乐</span>
         </router-link>
         <router-link to="/festival/scores" class="menu-item festival-item">
-          <div class="festival-icon">🎵</div>
+          <div class="festival-icon">🎼</div>
           <span>春节乐谱集</span>
         </router-link>
         <router-link to="/festival/contest" class="menu-item festival-item">
@@ -187,7 +187,7 @@
         <button @click="toggleTheme" class="theme-btn">
           <Moon v-if="theme === 'light'" class="w-4 h-4" />
           <Sun v-else class="w-4 h-4" />
-          <span>{{ theme === 'light' ? '深色模式' : '浅色模式' }}</span>
+          <span>{{ theme === 'light' ? '深色模式' : 'ǳɫģʽ' }}</span>
         </button>
       </div>
     </div>
@@ -329,7 +329,7 @@ const formatTime = (date: Date) => {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
   if (hours < 1) return '刚刚'
-  if (hours < 24) return `${hours}小时前`
+  if (hours < 24) return `${hours}Сʱǰ`
   if (days < 7) return `${days}天前`
   return date.toLocaleDateString('zh-CN')
 }

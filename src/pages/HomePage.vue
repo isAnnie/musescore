@@ -110,8 +110,7 @@ const buildNewScore = (title: string): Score => ({
 })
 
 const createNewScore = () => {
-  const score = scoreStore.createScore(buildNewScore('未命名乐谱'))
-  router.push(`/editor/${score.id}`)
+  router.push('/editor')
 }
 
 const importScore = () => {

@@ -229,9 +229,9 @@ const canRedo = ref(false)
 const noteTypes = [
   { type: 'whole', label: '全音符', icon: '𝅝', duration: 4 },
   { type: 'half', label: '二分音符', icon: '𝅗𝅥', duration: 2 },
-  { type: 'quarter', label: '四分音符', icon: '𝅘𝅥', duration: 1 },
-  { type: 'eighth', label: '八分音符', icon: '𝅘𝅥𝅮', duration: 0.5 },
-  { type: 'sixteenth', label: '十六分音符', icon: '𝅘𝅥𝅯', duration: 0.25 }
+  { type: 'quarter', label: '四分音符', icon: '♩', duration: 1 },
+  { type: 'eighth', label: '八分音符', icon: '♪', duration: 0.5 },
+  { type: 'sixteenth', label: '十六分音符', icon: '♬', duration: 0.25 }
 ]
 
 // 升降号配置

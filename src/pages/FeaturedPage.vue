@@ -40,7 +40,7 @@
 
           <div class="score-meta">
             <span>🎼 {{ score.keySignature }} 调</span>
-            <span>🕒 {{ score.timeSignature.numerator }}/{{ score.timeSignature.denominator }}</span>
+            <span>⏱ {{ score.timeSignature.numerator }}/{{ score.timeSignature.denominator }}</span>
             <span>♩={{ score.tempo }}</span>
           </div>
 

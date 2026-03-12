@@ -210,7 +210,7 @@
 
     <!-- 空状态 -->
     <div v-else class="properties-empty">
-      <div class="empty-icon">🎵</div>
+      <div class="empty-icon">🎼</div>
       <p class="empty-text">未选中音符</p>
       <p class="empty-hint">点击音符以编辑其属性</p>
     </div>
@@ -257,9 +257,9 @@ const pianoKeys = computed(() => {
 const noteTypes = [
   { value: 'whole', label: '全音符', icon: '𝅝' },
   { value: 'half', label: '二分音符', icon: '𝅗𝅥' },
-  { value: 'quarter', label: '四分音符', icon: '𝅘𝅥' },
-  { value: 'eighth', label: '八分音符', icon: '𝅘𝅥𝅮' },
-  { value: 'sixteenth', label: '十六分音符', icon: '𝅘𝅥𝅯' }
+  { value: 'quarter', label: '四分音符', icon: '♩' },
+  { value: 'eighth', label: '八分音符', icon: '♪' },
+  { value: 'sixteenth', label: '十六分音符', icon: '♬' }
 ]
 
 // 升降号配置

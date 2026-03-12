@@ -125,7 +125,7 @@
           <button class="close-btn" @click="previewScore = null">×</button>
         </div>
         <p class="score-meta">
-          作曲：{{ previewScore.composer || '未知' }} · 速度：{{ previewScore.tempo }} ·
+          作曲：{{ previewScore.composer || 'δ֪' }} · 速度：{{ previewScore.tempo }} ·
           节拍：{{ previewScore.timeSignature.numerator }}/{{ previewScore.timeSignature.denominator }} ·
           调号：{{ previewScore.keySignature }}
         </p>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="playback-control">
     <div class="control-buttons">
       <button @click="rewind" class="control-btn" title="快退">
@@ -12,7 +12,7 @@
         <Pause class="w-5 h-5" />
       </button>
 
-      <button @click="stop" class="control-btn" title="停止">
+      <button @click="stop" class="control-btn" title="ֹͣ">
         <Square class="w-5 h-5" />
       </button>
 
@@ -30,7 +30,7 @@
     </div>
 
     <div class="tempo-control">
-      <button @click="decreaseTempo" class="tempo-btn" title="减慢">
+      <button @click="decreaseTempo" class="tempo-btn" title="减慢" :disabled="isPlaying">
         <Minus class="w-4 h-4" />
       </button>
 
@@ -38,7 +38,7 @@
         <span class="tempo-value">{{ tempo }} BPM</span>
       </div>
 
-      <button @click="increaseTempo" class="tempo-btn" title="加快">
+      <button @click="increaseTempo" class="tempo-btn" title="加快" :disabled="isPlaying">
         <Plus class="w-4 h-4" />
       </button>
 
@@ -49,6 +49,7 @@
         max="200"
         @change="updateTempo"
         class="tempo-slider"
+        :disabled="isPlaying"
       />
     </div>
 
@@ -138,6 +139,7 @@ const forward = () => {
 }
 
 const updateTempo = () => {
+  if (props.isPlaying) return
   const nextTempo = Math.min(200, Math.max(40, Number(localTempo.value) || 120))
   localTempo.value = nextTempo
   emit('tempo-change', nextTempo)

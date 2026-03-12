@@ -1,7 +1,7 @@
 <template>
   <div class="not-found-page flex items-center justify-center min-h-screen bg-gray-50">
     <div class="text-center max-w-md p-8">
-      <div class="text-8xl mb-6">🎵</div>
+      <div class="text-8xl mb-6">🎼</div>
       <h1 class="text-3xl font-bold text-gray-800 mb-4">页面未找到</h1>
       <p class="text-gray-600 mb-8">
         抱歉，您访问的页面不存在。可能是因为：

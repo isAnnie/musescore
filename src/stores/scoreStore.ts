@@ -246,7 +246,7 @@ export const useScoreStore = defineStore('score', () => {
     return {
       id: Date.now().toString(),
       title: base.title,
-      composer: base.composer?.trim() || '未知',
+      composer: base.composer?.trim() || 'δ֪',
       tempo: base.tempo,
       timeSignature: base.timeSignature,
       keySignature: base.keySignature,
@@ -320,7 +320,7 @@ export const useScoreStore = defineStore('score', () => {
     const title = doc.querySelector('work > work-title')?.textContent?.trim()
       || doc.querySelector('movement-title')?.textContent?.trim()
       || fallbackTitle
-    const composer = doc.querySelector('identification > creator[type="composer"]')?.textContent?.trim() || '未知'
+    const composer = doc.querySelector('identification > creator[type="composer"]')?.textContent?.trim() || 'δ֪'
 
     const notes: Note[] = []
     type PedalMarker = {
