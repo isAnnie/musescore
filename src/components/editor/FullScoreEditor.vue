@@ -95,6 +95,27 @@
       @tempo-change="updateTempo"
       class="playback-control-floating"
     />
+
+    <div v-if="showPlayModeDialog" class="play-mode-overlay">
+      <div class="play-mode-dialog">
+        <h3 class="mode-title">选择播放模式</h3>
+        <p class="mode-desc">可切换到 MIDI 键盘瀑布流模式进行沉浸式播放。</p>
+        <div class="mode-actions">
+          <button class="mode-btn" type="button" @click="startPlaybackByMode('normal')">普通播放</button>
+          <button class="mode-btn mode-btn-primary" type="button" @click="startPlaybackByMode('midi_keyboard')">
+            MIDI 键盘瀑布流
+          </button>
+        </div>
+        <button class="mode-cancel" type="button" @click="showPlayModeDialog = false">取消</button>
+      </div>
+    </div>
+
+    <MidiKeyboardPlayModal
+      v-if="showMidiKeyboardModal"
+      :events="midiWaterfallEvents"
+      :current-time="currentTime"
+      @close="showMidiKeyboardModal = false"
+    />
   </div>
 </template>
 
@@ -113,6 +134,7 @@ import ScoreCanvas from './ScoreCanvas.vue'
 import EditorProperties from './EditorProperties.vue'
 import EditorStatusBar from './EditorStatusBar.vue'
 import PlaybackControl from './PlaybackControl.vue'
+import MidiKeyboardPlayModal from './MidiKeyboardPlayModal.vue'
 
 type PublishPayload = {
   visibility: 'public' | 'private' | 'unlisted'
@@ -150,6 +172,12 @@ const zoomLevel = ref(100)
 
 const staffTop = 40
 const timelineRowHeight = 150
+type PlayMode = 'normal' | 'midi_keyboard'
+type TimelineNoteEvent = {
+  note: Note
+  startBeat: number
+  endBeat: number
+}
 
 // 播放状态
 const isPlaying = ref(false)
@@ -158,6 +186,9 @@ const currentTime = ref(0)
 const totalTime = ref(0)
 const tempo = ref(120)
 const currentPlaybackMeasureIndex = ref<number | null>(null)
+const showPlayModeDialog = ref(false)
+const showMidiKeyboardModal = ref(false)
+const selectedPlayMode = ref<PlayMode>('normal')
 
 // 音频组件
 let piano: Tone.Sampler | null = null
@@ -166,6 +197,7 @@ let metronomeLoop: Tone.Loop | null = null
 let transport = Tone.Transport
 let playbackEndEventId: number | null = null
 let progressTimer: ReturnType<typeof setInterval> | null = null
+let progressRafId: number | null = null
 let totalPlaybackTicks = 0
 const PROGRESS_UPDATE_INTERVAL_MS = 80
 
@@ -391,6 +423,49 @@ const canTieNext = computed(() => {
 
 const currentPosition = computed(() => {
   return { x: 0, y: 0 } // 根据实际光标位置更新
+})
+
+const buildTimelineNoteEvents = (): TimelineNoteEvent[] => {
+  const beatsPerMeasure = getBeatsPerMeasureForPlayback()
+  const timelineColumns = getTimelineColumns(notes.value)
+  const fallbackStartByColumn = new Map<string, number>()
+
+  let fallbackCurrentBeat = 0
+  timelineColumns.forEach((column) => {
+    if (!column.length) return
+    const key = getTimelineColumnKey(column[0])
+    fallbackStartByColumn.set(key, fallbackCurrentBeat)
+    const columnDuration = column.reduce((maxDuration, note) => Math.max(maxDuration, note.duration || 0), 0)
+    fallbackCurrentBeat += Math.max(0, columnDuration)
+  })
+
+  return notes.value
+    .filter((note) => !note.isRest)
+    .map((note) => {
+      const absoluteFromMeasure = getAbsoluteBeatFromMeasure(note, beatsPerMeasure)
+      const fallbackStart = fallbackStartByColumn.get(getTimelineColumnKey(note)) ?? 0
+      const startBeat = absoluteFromMeasure ?? fallbackStart
+      const duration = Math.max(0, note.duration || 0)
+      return {
+        note,
+        startBeat,
+        endBeat: startBeat + duration
+      }
+    })
+    .sort((a, b) => {
+      if (Math.abs(a.startBeat - b.startBeat) > 0.001) return a.startBeat - b.startBeat
+      return sortNotesByTimeline(a.note, b.note)
+    })
+}
+
+const midiWaterfallEvents = computed(() => {
+  const beatSeconds = 60 / Math.max(1, tempo.value)
+  return buildTimelineNoteEvents().map((event, index) => ({
+    id: `${event.note.id}-${index}`,
+    pitch: event.note.pitch,
+    startSec: event.startBeat * beatSeconds,
+    durationSec: Math.max(0.04, (event.endBeat - event.startBeat) * beatSeconds)
+  }))
 })
 
 // 工具切换
@@ -651,6 +726,14 @@ const playScore = async () => {
     return
   }
 
+  showPlayModeDialog.value = true
+}
+
+const startPlaybackByMode = async (mode: PlayMode) => {
+  showPlayModeDialog.value = false
+  selectedPlayMode.value = mode
+  showMidiKeyboardModal.value = mode === 'midi_keyboard'
+
   try {
     await Tone.start()
     await initAudioComponents()
@@ -698,6 +781,8 @@ const stopPlayback = () => {
   transport.position = 0
   clearPlaybackEndEvent()
   isPlaying.value = false
+  showPlayModeDialog.value = false
+  showMidiKeyboardModal.value = false
   stopProgressTimer()
   currentTime.value = 0
   currentPlaybackMeasureIndex.value = null
@@ -798,6 +883,10 @@ const stopProgressTimer = () => {
   if (progressTimer === null) return
   clearInterval(progressTimer)
   progressTimer = null
+  if (progressRafId !== null) {
+    cancelAnimationFrame(progressRafId)
+    progressRafId = null
+  }
 }
 
 const startProgressTimer = () => {
@@ -807,7 +896,7 @@ const startProgressTimer = () => {
     const elapsed = Number.isFinite(transport.seconds) ? transport.seconds : 0
     const duration = totalTime.value > 0 ? totalTime.value : 0
     const nextCurrentTime = duration > 0 ? Math.min(Math.max(0, elapsed), duration) : 0
-    if (Math.abs(nextCurrentTime - currentTime.value) >= 0.02) {
+    if (Math.abs(nextCurrentTime - currentTime.value) >= 0.008) {
       currentTime.value = nextCurrentTime
     }
     const nextMeasureIndex = getCurrentMeasureIndexFromTransport()
@@ -817,6 +906,18 @@ const startProgressTimer = () => {
   }
 
   updateProgress()
+  if (showMidiKeyboardModal.value) {
+    const tick = () => {
+      if (!isPlaying.value) {
+        progressRafId = null
+        return
+      }
+      updateProgress()
+      progressRafId = requestAnimationFrame(tick)
+    }
+    progressRafId = requestAnimationFrame(tick)
+    return
+  }
   progressTimer = setInterval(updateProgress, PROGRESS_UPDATE_INTERVAL_MS)
 }
 
@@ -839,44 +940,8 @@ const scheduleNotesForPlayback = () => {
   clearPlaybackEndEvent()
   ;(piano as any).releaseAll?.()
 
-  type NoteEvent = {
-    note: Note
-    startBeat: number
-    endBeat: number
-  }
   type PedalSegment = { startBeat: number; endBeat: number }
-
-  const beatsPerMeasure = getBeatsPerMeasureForPlayback()
-  const timelineColumns = getTimelineColumns(notes.value)
-  const fallbackStartByColumn = new Map<string, number>()
-
-  // For notes without measure/beat metadata, preserve old sequential behavior as fallback.
-  let fallbackCurrentBeat = 0
-  timelineColumns.forEach((column) => {
-    if (!column.length) return
-    const key = getTimelineColumnKey(column[0])
-    fallbackStartByColumn.set(key, fallbackCurrentBeat)
-    const columnDuration = column.reduce((maxDuration, note) => Math.max(maxDuration, note.duration || 0), 0)
-    fallbackCurrentBeat += Math.max(0, columnDuration)
-  })
-
-  const noteEvents: NoteEvent[] = notes.value
-    .filter((note) => !note.isRest)
-    .map((note) => {
-      const absoluteFromMeasure = getAbsoluteBeatFromMeasure(note, beatsPerMeasure)
-      const fallbackStart = fallbackStartByColumn.get(getTimelineColumnKey(note)) ?? 0
-      const startBeat = absoluteFromMeasure ?? fallbackStart
-      const duration = Math.max(0, note.duration || 0)
-      return {
-        note,
-        startBeat,
-        endBeat: startBeat + duration
-      }
-    })
-    .sort((a, b) => {
-      if (Math.abs(a.startBeat - b.startBeat) > 0.001) return a.startBeat - b.startBeat
-      return sortNotesByTimeline(a.note, b.note)
-    })
+  const noteEvents = buildTimelineNoteEvents()
 
   const pedalSegments: PedalSegment[] = []
   let activePedalStart: number | null = null
@@ -1163,6 +1228,14 @@ watch(
     }
   }
 )
+
+watch(
+  () => showMidiKeyboardModal.value,
+  () => {
+    if (!isPlaying.value) return
+    startProgressTimer()
+  }
+)
 </script>
 
 <style scoped>
@@ -1199,6 +1272,41 @@ watch(
 
 .playback-control-floating {
   @apply fixed right-6 bottom-6 z-50;
+}
+
+.play-mode-overlay {
+  @apply fixed inset-0 z-[65] flex items-center justify-center;
+  background: rgba(2, 6, 23, 0.66);
+}
+
+.play-mode-dialog {
+  @apply w-[440px] max-w-[90vw] rounded-2xl border border-slate-300/30 p-6 text-center;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.55);
+}
+
+.mode-title {
+  @apply text-white text-xl font-semibold;
+}
+
+.mode-desc {
+  @apply mt-2 text-slate-200 text-sm;
+}
+
+.mode-actions {
+  @apply mt-5 flex gap-3;
+}
+
+.mode-btn {
+  @apply flex-1 rounded-lg border border-slate-200/30 px-3 py-2 text-slate-100 hover:bg-slate-600/40 transition;
+}
+
+.mode-btn-primary {
+  @apply border-cyan-300/60 bg-cyan-500/30 hover:bg-cyan-400/40;
+}
+
+.mode-cancel {
+  @apply mt-4 text-sm text-slate-300 hover:text-white transition;
 }
 </style>
 
