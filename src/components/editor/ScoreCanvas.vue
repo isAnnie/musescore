@@ -2,7 +2,12 @@
   <div
     ref="container"
     class="score-canvas-container"
-    :style="{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }"
+    :style="{
+      transform: `scale(${zoomLevel / 100})`,
+      transformOrigin: 'top left',
+      height: `${contentHeight}px`,
+      minHeight: `${contentHeight}px`
+    }"
   >
     <button class="debug-toggle" @click.stop="showDebugLayer = !showDebugLayer">
       {{ showDebugLayer ? '隐藏调试' : '显示调试' }}
@@ -80,6 +85,7 @@ let drawRafId: number | null = null
 const previewNote = ref<Note | null>(null)
 const isDragging = ref(false)
 const dragNoteId = ref<string | null>(null)
+const contentHeight = ref(420)
 const showDebugLayer = ref(false)
 const renderedNotePoints = ref(new Map<string, { x: number; y: number; clef: 'treble' | 'bass' }>())
 const placementCacheById = ref(new Map<string, SnapPoint>())
@@ -268,6 +274,15 @@ const measureLayoutFromWidth = (width: number) => {
   const drawableWidth = Math.max(50, staveWidth - 8)
 
   return { staveWidth, drawableWidth }
+}
+
+const getVisibleRowsPerPage = () => {
+  const fallbackRows = 2
+  if (!container.value) return fallbackRows
+  const viewportHost = container.value.parentElement
+  const viewportHeight = viewportHost?.clientHeight ?? container.value.clientHeight
+  const available = Math.max(0, viewportHeight - staffPadding.top - staffPadding.bottom)
+  return Math.max(1, Math.ceil(available / rowHeight))
 }
 
 const getStaffLayout = (rowIndex: number) => {
@@ -565,9 +580,21 @@ const drawScore = () => {
     placements.map(({ note, placement }) => [note.id, placement as SnapPoint])
   )
   const maxMeasureIndex = placements.length ? Math.max(...placements.map((item) => item.placement.measureIndex)) : 0
-  const measureCount = Math.max(1, maxMeasureIndex + 1)
+  const usedMeasureCount = Math.max(0, maxMeasureIndex + 1)
+  const rowsPerPage = getVisibleRowsPerPage()
+  const pageMeasureCount = rowsPerPage * measuresPerRow
+
+  let measureCount = Math.max(pageMeasureCount, usedMeasureCount)
+  // If notes already occupy the last measure of the current page, pre-render one more page.
+  if (usedMeasureCount > 0 && usedMeasureCount % pageMeasureCount === 0) {
+    measureCount += pageMeasureCount
+  }
+
   const rows = Math.max(1, Math.ceil(measureCount / measuresPerRow))
-  const height = Math.max(container.value.clientHeight, staffPadding.top + rows * rowHeight + staffPadding.bottom)
+  const viewportHost = container.value.parentElement
+  const viewportHeight = viewportHost?.clientHeight ?? container.value.clientHeight
+  const height = Math.max(viewportHeight, staffPadding.top + rows * rowHeight + staffPadding.bottom)
+  contentHeight.value = height
 
   vfHost.value.innerHTML = ''
 
@@ -1187,11 +1214,11 @@ watch(() => props.currentTool, (newTool) => {
 
 <style scoped>
 .score-canvas-container {
-  @apply relative w-full h-full;
+  @apply relative w-full;
 }
 
 .vf-host {
-  @apply w-full h-full bg-white;
+  @apply w-full bg-white;
   min-height: 420px;
 }
 
