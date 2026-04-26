@@ -39,10 +39,10 @@
           <Layers class="w-5 h-5" />
           <span>我的编曲</span>
         </router-link> -->
-        <!-- <router-link to="/templates" class="menu-item" :class="{ active: isActive('/templates') }">
+        <router-link to="/resource-templates" class="menu-item" :class="{ active: isActive('/resource-templates') }">
           <LayoutTemplate class="w-5 h-5" />
-          <span>模板库</span>
-        </router-link> -->
+          <span>资源模板库</span>
+        </router-link>
       </div>
 
       <div class="menu-section">
@@ -67,27 +67,17 @@
 
       <div class="menu-section">
         <h3 class="menu-title">社区</h3>
-        <router-link to="/groups" class="menu-item" :class="{ active: isActive('/groups') }">
-          <Users class="w-5 h-5" />
-          <span>兴趣小组</span>
-          <span v-if="groupNotifications > 0" class="badge">{{ groupNotifications }}</span>
-        </router-link>
         <router-link to="/forums" class="menu-item" :class="{ active: isActive('/forums') }">
           <MessageSquare class="w-5 h-5" />
           <span>论坛</span>
         </router-link>
-        <router-link to="/contests" class="menu-item" :class="{ active: isActive('/contests') }">
-          <Award class="w-5 h-5" />
-          <span>创作大赛</span>
-          <span v-if="hasActiveContest" class="badge badge-live">进行中</span>
-        </router-link>
-        <router-link to="/collaborations" class="menu-item" :class="{ active: isActive('/collaborations') }">
-          <GitBranch class="w-5 h-5" />
-          <span>协作项目</span>
+        <router-link to="/browse" class="menu-item" :class="{ active: isActive('/forums') }">
+          <Music class="w-5 h-5" />
+          <span>乐谱中心</span>
         </router-link>
       </div>
 
-      <div class="menu-section">
+      <!-- <div class="menu-section">
         <h3 class="menu-title">工具</h3>
         <router-link to="/tuner" class="menu-item" :class="{ active: isActive('/tuner') }">
           <Music class="w-5 h-5" />
@@ -105,10 +95,10 @@
           <Repeat class="w-5 h-5" />
           <span>移调工具</span>
         </router-link>
-      </div>
+      </div> -->
 
       <!-- 节日特辑 -->
-      <div class="festival-section" v-if="showFestivalSection">
+      <!-- <div class="festival-section" v-if="showFestivalSection">
         <div class="festival-header">
           <Sparkles class="w-5 h-5 text-yellow-500" />
           <h3 class="festival-title">新春特辑</h3>
@@ -126,7 +116,7 @@
           <span>新春创作大赛</span>
           <span class="badge badge-live">火热进行</span>
         </router-link>
-      </div>
+      </div> -->
     </nav>
 
     <!-- 快速操作 -->

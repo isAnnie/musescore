@@ -6,6 +6,7 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import HomePage from '@/pages/HomePage.vue'
 import BrowsePage from '@/pages/BrowsePage.vue'
 import FeaturedPage from '@/pages/FeaturedPage.vue'
+import ResourceTemplatesPage from '@/pages/ResourceTemplatesPage.vue'
 import CommunityPage from '@/pages/CommunityPage.vue'
 import ProfilePage from '@/pages/ProfilePage.vue'
 import EditorPage from '@/pages/EditorPage.vue'
@@ -41,6 +42,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', name: 'home', component: HomePage },
       { path: 'browse', name: 'browse', component: BrowsePage },
       { path: 'featured', name: 'featured', component: FeaturedPage },
+      { path: 'resource-templates', name: 'resource-templates', component: ResourceTemplatesPage },
       { path: 'forum', name: 'forum', component: CommunityPage },
       { path: 'profile', name: 'profile', component: ProfilePage, meta: { requiresAuth: true } },
       { path: 'my-scores', name: 'my-scores', component: ProfilePage, meta: { requiresAuth: true } },

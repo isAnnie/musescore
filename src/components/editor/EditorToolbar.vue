@@ -6,6 +6,7 @@
       <h4 class="section-title">工具</h4>
       <div class="tool-grid">
         <button
+          type="button"
           @click="selectTool('select')"
           :class="['tool-btn', { 'active': currentTool === 'select' }]"
           title="选择工具 (1)"
@@ -14,6 +15,7 @@
         </button>
         
         <button
+          type="button"
           @click="selectTool('note')"
           :class="['tool-btn', { 'active': currentTool === 'note' }]"
           title="音符工具 (2)"
@@ -22,6 +24,7 @@
         </button>
         
         <button
+          type="button"
           @click="selectTool('rest')"
           :class="['tool-btn', { 'active': currentTool === 'rest' }]"
           title="休止符工具 (3)"
@@ -30,6 +33,7 @@
         </button>
         
         <button
+          type="button"
           @click="selectTool('chord')"
           :class="['tool-btn', { 'active': currentTool === 'chord' }]"
           title="和弦工具 (4)"
@@ -38,6 +42,7 @@
         </button>
         
         <button
+          type="button"
           @click="selectTool('eraser')"
           :class="['tool-btn', { 'active': currentTool === 'eraser' }]"
           title="橡皮擦工具 (5)"
@@ -46,6 +51,7 @@
         </button>
         
         <button
+          type="button"
           @click="selectTool('text')"
           :class="['tool-btn', { 'active': currentTool === 'text' }]"
           title="文本工具 (6)"
@@ -256,7 +262,9 @@ const snapOptions = [
 ]
 
 // 选择工具
-const selectTool = (tool: string) => {
+type EditorTool = 'select' | 'note' | 'rest' | 'chord' | 'eraser' | 'text'
+
+const selectTool = (tool: EditorTool) => {
   emit('tool-change', tool)
 }
 

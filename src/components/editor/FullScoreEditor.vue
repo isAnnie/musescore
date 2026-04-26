@@ -161,7 +161,7 @@ const handleToggleAutoSave = () => {
 const scoreStore = useScoreStore()
 
 // 编辑器状态
-const currentTool = ref<'select' | 'note' | 'rest' | 'chord' | 'eraser' | 'text'>('select')
+const currentTool = ref<EditorTool>('select')
 const selectedNoteType = ref<'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'>('quarter')
 const selectedAccidental = ref<'sharp' | 'flat' | 'natural' | null>(null)
 const selectedArticulation = ref<'staccato' | 'tenuto' | 'accent' | 'tremolo' | null>(null)
@@ -173,6 +173,7 @@ const zoomLevel = ref(100)
 const staffTop = 40
 const timelineRowHeight = 150
 type PlayMode = 'normal' | 'midi_keyboard'
+type EditorTool = 'select' | 'note' | 'rest' | 'chord' | 'eraser' | 'text'
 type TimelineNoteEvent = {
   note: Note
   startBeat: number
@@ -469,8 +470,11 @@ const midiWaterfallEvents = computed(() => {
 })
 
 // 工具切换
-const handleToolChange = (tool: any) => {
-  currentTool.value = tool
+const EDITOR_TOOLS: EditorTool[] = ['select', 'note', 'rest', 'chord', 'eraser', 'text']
+
+const handleToolChange = (tool: string) => {
+  if (!EDITOR_TOOLS.includes(tool as EditorTool)) return
+  currentTool.value = tool as EditorTool
   selectedNoteId.value = null // 切换工具时取消选中
 }
 
@@ -1190,7 +1194,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
       currentTool.value = 'rest'
       break
     case '4':
+      currentTool.value = 'chord'
+      break
+    case '5':
       currentTool.value = 'eraser'
+      break
+    case '6':
+      currentTool.value = 'text'
       break
     case '.':
       dottedNote.value = !dottedNote.value

@@ -6,9 +6,9 @@
         <div class="flex justify-between items-center py-2">
           <!-- 左 -->
           <div class="flex items-center space-x-4">
-            <a href="#" class="hover:text-blue-300">下载桌面版</a>
-            <a href="#" class="hover:text-blue-300">乐谱商店</a>
-            <a href="#" class="hover:text-blue-300">帮助中心</a>
+            <!-- <a href="#" class="hover:text-blue-300">下载桌面版</a>
+            <a href="#" class="hover:text-blue-300">乐谱商店</a> -->
+            <!-- <a href="#" class="hover:text-blue-300">帮助中心</a> -->
           </div>
           
           <!-- 右 -->
@@ -238,6 +238,7 @@ import {
   Compass,
   Star,
   BookOpen,
+  LayoutTemplate,
   Zap,
   DollarSign,
   MessageSquare
@@ -319,6 +320,7 @@ const navItems = [
   { path: '/', label: '首页', icon: Home },
   { path: '/browse', label: '浏览', icon: Compass },
   { path: '/featured', label: '精选乐谱', icon: Star },
+  { path: '/resource-templates', label: '资源模板库', icon: LayoutTemplate },
   { path: '/my-scores', label: '我的乐谱', icon: BookOpen },
 ]
 

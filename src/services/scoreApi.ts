@@ -1,4 +1,4 @@
-﻿import type { Score } from '@/types/score'
+import type { RecommendedScore, Score } from '@/types/score'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
@@ -17,6 +17,13 @@ type ScorePayload = {
   tags?: string[]
   description?: string
   visibility?: 'public' | 'private' | 'unlisted'
+}
+
+type RecommendationPayload = ScorePayload & {
+  recommendationScore: number
+  recommendReason: string
+  matchedTags?: string[]
+  strategy: 'personalized' | 'cold_start'
 }
 
 class ApiError extends Error {
@@ -42,10 +49,30 @@ const authHeaders = () => {
   }
 }
 
+const optionalAuthHeaders = () => {
+  const token = getToken()
+  return token
+    ? {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    : {
+        'Content-Type': 'application/json'
+      }
+}
+
 const toScore = (payload: ScorePayload): Score => ({
   ...payload,
   createdAt: new Date(payload.createdAt),
   updatedAt: new Date(payload.updatedAt)
+})
+
+const toRecommendedScore = (payload: RecommendationPayload): RecommendedScore => ({
+  ...toScore(payload),
+  recommendationScore: payload.recommendationScore,
+  recommendReason: payload.recommendReason,
+  matchedTags: payload.matchedTags ?? [],
+  strategy: payload.strategy
 })
 
 const parseErrorMessage = async (response: Response) => {
@@ -96,6 +123,17 @@ export const listPublicScores = async (): Promise<Score[]> => {
   }
   const data = await response.json() as ScorePayload[]
   return data.map(toScore)
+}
+
+export const listRecommendedScores = async (limit = 6): Promise<RecommendedScore[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/scores/recommendations?limit=${limit}`, {
+    headers: optionalAuthHeaders()
+  })
+  if (!response.ok) {
+    return throwApiError(response)
+  }
+  const data = await response.json() as RecommendationPayload[]
+  return data.map(toRecommendedScore)
 }
 
 export const getScoreById = async (id: string): Promise<Score> => {

@@ -2,9 +2,9 @@
   <div class="publish-page">
     <section class="hero">
       <div>
-        <h1>乐谱发布中心</h1>
+        <h1>乐谱中心</h1>
         <p>
-          发布内容来源于你在乐谱编辑页保存到数据库的作品。你可以发布、下架、查看和复制公开乐谱。
+          这里可以统一管理已发布乐谱、浏览公开作品，并根据你的创作习惯获取推荐结果。
         </p>
       </div>
       <div class="hero-actions">
@@ -27,14 +27,64 @@
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
+    <section v-if="recommendedScores.length > 0" class="card recommend-card">
+      <div class="card-head">
+        <h2>{{ recommendationHeading }}（{{ recommendedScores.length }}）</h2>
+        <p>{{ recommendationDescription }}</p>
+      </div>
+
+      <div class="score-card-grid">
+        <article v-for="score in recommendedScores" :key="score.id" class="score-card recommend">
+          <div>
+            <div class="recommend-title-row">
+              <p class="score-title">{{ score.title }}</p>
+              <span class="recommend-badge">
+                匹配度 {{ formatRecommendationScore(score.recommendationScore) }}
+              </span>
+            </div>
+            <p class="score-meta">
+              {{ score.composer || '未知作曲' }} · {{ score.tempo }} BPM · {{ score.keySignature }}
+            </p>
+            <p class="recommend-reason">{{ score.recommendReason }}</p>
+            <p class="score-meta">
+              音符：{{ score.notes.length }} · 小节：{{ score.measures.length }} · 拍号：
+              {{ score.timeSignature.numerator }}/{{ score.timeSignature.denominator }}
+            </p>
+            <p class="score-tags">{{ displayRecommendationTags(score) }}</p>
+          </div>
+          <div class="score-actions">
+            <button class="btn btn-secondary" @click="previewPublicScore(score.id)">查看详情</button>
+            <template v-if="isMyScore(score.id)">
+              <button
+                class="btn btn-warning"
+                :disabled="actionLoadingId === score.id"
+                @click="unpublishById(score.id)"
+              >
+                {{ actionLoadingId === score.id ? '处理中...' : '下架我的乐谱' }}
+              </button>
+            </template>
+            <template v-else>
+              <button
+                class="btn btn-primary"
+                :disabled="actionLoadingId === score.id"
+                @click="copyScore(score.id)"
+              >
+                {{ actionLoadingId === score.id ? '复制中...' : '复制为我的草稿' }}
+              </button>
+            </template>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section v-if="userStore.isLoggedIn" class="card">
       <div class="card-head">
         <h2>我的数据库乐谱（发布管理）</h2>
-        <p>以下均为你已保存到数据库的乐谱，可一键发布或下架。</p>
+        <p>以下为你已保存到数据库的乐谱，可一键发布、下架，或返回编辑器继续修改。</p>
       </div>
 
       <div v-if="myScores.length === 0" class="empty-hint">
-        你还没有已保存的乐谱，请先前往编辑页创建并保存作品。
+        你还没有已保存到数据库的乐谱，请先到编辑页创建并保存作品。
       </div>
 
       <div v-else class="score-card-grid">
@@ -74,7 +124,7 @@
     <section class="card">
       <div class="card-head">
         <h2>公开乐谱广场（{{ filteredPublicScores.length }}）</h2>
-        <p>查看公开乐谱；可复制他人作品为你的草稿并继续编辑。</p>
+        <p>查看公开乐谱，也可以把他人的作品复制为你的草稿后继续编辑。</p>
       </div>
 
       <div v-if="filteredPublicScores.length === 0" class="empty-hint">
@@ -91,7 +141,9 @@
             <p class="score-meta">
               音符：{{ score.notes.length }} · 小节：{{ score.measures.length }}
             </p>
-            <p class="score-tags">{{ (score.tags || []).slice(0, 4).join('，') || '暂无标签' }}</p>
+            <p class="score-tags">
+              {{ (score.tags || []).slice(0, 4).join('、') || '暂无标签' }}
+            </p>
           </div>
           <div class="score-actions">
             <button class="btn btn-secondary" @click="previewPublicScore(score.id)">查看详情</button>
@@ -125,9 +177,9 @@
           <button class="close-btn" @click="previewScore = null">×</button>
         </div>
         <p class="score-meta">
-          作曲：{{ previewScore.composer || 'δ֪' }} · 速度：{{ previewScore.tempo }} ·
-          节拍：{{ previewScore.timeSignature.numerator }}/{{ previewScore.timeSignature.denominator }} ·
-          调号：{{ previewScore.keySignature }}
+          作曲：{{ previewScore.composer || '未知' }} · 速度：{{ previewScore.tempo }} · 拍号：
+          {{ previewScore.timeSignature.numerator }}/{{ previewScore.timeSignature.denominator }} · 调号：
+          {{ previewScore.keySignature }}
         </p>
         <p class="score-meta">更新时间：{{ formatDate(previewScore.updatedAt) }}</p>
         <p class="score-meta">简介：{{ previewScore.description || '暂无简介' }}</p>
@@ -140,12 +192,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import type { Score } from '@/types/score'
+import type { RecommendedScore, Score } from '@/types/score'
 import {
   createScoreOnServer,
   getPublicScoreById,
   listMyScores,
   listPublicScores,
+  listRecommendedScores,
   updateScoreOnServer
 } from '@/services/scoreApi'
 
@@ -159,9 +212,20 @@ const searchQuery = ref('')
 const sortBy = ref<'updated' | 'created' | 'title'>('updated')
 const myScores = ref<Score[]>([])
 const publicScores = ref<Score[]>([])
+const recommendedScores = ref<RecommendedScore[]>([])
 const previewScore = ref<Score | null>(null)
 
 const myIdSet = computed(() => new Set(myScores.value.map((score) => score.id)))
+const recommendationMode = computed(() => recommendedScores.value[0]?.strategy ?? 'cold_start')
+const recommendationHeading = computed(() => (
+  recommendationMode.value === 'personalized' ? '为你推荐' : '推荐乐谱'
+))
+const recommendationDescription = computed(() => (
+  recommendationMode.value === 'personalized'
+    ? '根据你已保存乐谱的标签、调号、拍号和速度生成个性化推荐。'
+    : '当前为冷启动推荐，优先展示近期公开且信息较完整的乐谱。'
+))
+
 const isMyScore = (scoreId: string) => myIdSet.value.has(scoreId)
 const isPublished = (score: Score) => !score.isDraft && (score.visibility ?? 'private') === 'public'
 
@@ -192,16 +256,25 @@ const filteredPublicScores = computed(() => {
 
 const formatDate = (date: Date) => new Date(date).toLocaleString('zh-CN')
 
+const formatRecommendationScore = (score: number) => `${Math.round(score * 100)}%`
+
+const displayRecommendationTags = (score: RecommendedScore) => {
+  const tags = score.matchedTags?.length ? score.matchedTags : (score.tags || []).slice(0, 4)
+  return tags.length ? `标签：${tags.join('、')}` : '暂无标签'
+}
+
 const loadData = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [publicResult, myResult] = await Promise.all([
+    const [publicResult, myResult, recommendationResult] = await Promise.all([
       listPublicScores(),
-      userStore.isLoggedIn ? listMyScores() : Promise.resolve([] as Score[])
+      userStore.isLoggedIn ? listMyScores() : Promise.resolve([] as Score[]),
+      listRecommendedScores(6)
     ])
     publicScores.value = publicResult
     myScores.value = myResult
+    recommendedScores.value = recommendationResult
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '加载乐谱数据失败'
   } finally {
@@ -346,6 +419,11 @@ onMounted(() => {
   padding: 16px;
 }
 
+.recommend-card {
+  border-color: #99f6e4;
+  background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+}
+
 .card-head h2 {
   font-size: 20px;
   font-weight: 700;
@@ -377,6 +455,35 @@ onMounted(() => {
 .score-card.mine {
   border-color: #93c5fd;
   background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.score-card.recommend {
+  border-color: #99f6e4;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+}
+
+.recommend-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recommend-badge {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #ccfbf1;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.recommend-reason {
+  margin-top: 8px;
+  color: #0f766e;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .score-title {

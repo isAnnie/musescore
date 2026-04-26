@@ -52,6 +52,13 @@ export interface Score {
   visibility?: 'public' | 'private' | 'unlisted'
 }
 
+export interface RecommendedScore extends Score {
+  recommendationScore: number
+  recommendReason: string
+  matchedTags?: string[]
+  strategy: 'personalized' | 'cold_start'
+}
+
 export interface User {
   id: string
   username: string
