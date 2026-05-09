@@ -341,6 +341,8 @@ const getRenderedYFromPitch = (rowIndex: number, clef: 'treble' | 'bass', pitch:
   return middleC - positionFromMiddleC * pitchStepY
 }
 
+// 将原始鼠标坐标吸附到五线谱编辑网格。
+// 结果同时包含视觉坐标与乐理语义信息，新增、拖拽、命中检测都依赖这一套定位结果。
 const snapPointToGrid = (point: { x: number; y: number }, width: number) => {
   const beatSnap = getBeatSnapValue()
   const beatsPerMeasure = getBeatsPerMeasure()
@@ -454,6 +456,8 @@ const addArticulationMark = (note: Pick<Note, 'isRest' | 'articulation'>, staveN
   staveNote.addModifier(mark, 0)
 }
 
+// 单音渲染入口：把内部 Note 模型转换为 VexFlow 的 StaveNote，
+// 并统一挂载升降号、附点、踏板标记、演奏法标记与选中态。
 const createVexNote = (note: Note | TickableNote) => {
   const clef = (note as Note).clef ?? 'treble'
   const staveNote = new StaveNote({
@@ -500,6 +504,8 @@ const createVexNote = (note: Note | TickableNote) => {
   return staveNote
 }
 
+// 和弦的多个音头必须落在同一个 StaveNote 中，
+// 所以这里先排序，再把每个音的修饰符映射到对应 keyIndex。
 const createVexChordNote = (chordNotes: Note[]) => {
   const sorted = [...chordNotes].sort((a, b) => b.position.y - a.position.y)
   const headNote = sorted[0]
@@ -571,6 +577,11 @@ const makeRestTickables = (gapBeats: number, clef: 'treble' | 'bass'): TickableN
   return tickables
 }
 
+// 乐谱总渲染流程：
+// 1. 计算每个音符所属的小节、拍点和谱表；
+// 2. 按行构建大谱表；
+// 3. 按声部/拍点组织 VexFlow 音符并自动补足休止符；
+// 4. 最后补绘连音线、踏板线、选中态与播放高亮。
 const drawScore = () => {
   if (!vfHost.value || !container.value) return
 
@@ -681,6 +692,7 @@ const drawScore = () => {
           const currentDuration = currentItem.note.duration || getDurationFromType(currentItem.note.type)
 
           if (currentItem.beat > cursorBeat + 0.001) {
+            // 当前拍点前有空白时，自动补足休止符，保证每个声部的小节时值完整。
             makeRestTickables(currentItem.beat - cursorBeat, clef).forEach((rest) => {
               vexNotes.push(createVexNote(rest))
             })
@@ -701,6 +713,7 @@ const drawScore = () => {
             const nextDuration = nextItem.note.duration || getDurationFromType(nextItem.note.type)
             const sameBeat = Math.abs(nextItem.beat - currentItem.beat) <= 0.001
             const sameDuration = Math.abs(nextDuration - currentDuration) <= 0.001
+            // 只有同拍且同时值的非休止符才会合并成和弦。
             if (!sameBeat || !sameDuration || nextItem.note.isRest) break
             chordNotes.push(nextItem.note)
             nextIndex += 1
@@ -723,6 +736,7 @@ const drawScore = () => {
         }
 
         if (cursorBeat < beatsPerMeasure - 0.001) {
+          // 声部结尾没写满一小节时，也要自动补尾部休止符以满足 VexFlow 节拍要求。
           makeRestTickables(beatsPerMeasure - cursorBeat, clef).forEach((rest) => {
             vexNotes.push(createVexNote(rest))
           })
@@ -896,6 +910,8 @@ const drawScore = () => {
   }
 }
 
+// 命中检测优先使用最终渲染后的 SVG 坐标，保证点击结果与用户眼睛看到的位置一致；
+// 如果渲染坐标不可用，再退回到结构化拍点和视觉估算做兜底。
 const findNoteByPoint = (x: number, y: number, width: number) => {
   const getCachedPlacement = (note: Note) => {
     return placementCacheById.value.get(note.id) ?? getPlacementForNote(note, width)
@@ -981,6 +997,7 @@ const updateDebugState = (point: { x: number; y: number }, snapped: SnapPoint, h
   }
 }
 
+// 点击时先判定是否命中已有音符；未命中时才把吸附后的定位结果交给外层编辑器新增音符。
 const handleCanvasClick = (event: MouseEvent) => {
   if (!container.value) return
 
@@ -1019,6 +1036,7 @@ const handleCanvasClick = (event: MouseEvent) => {
   })
 }
 
+// 鼠标移动同时承担拖拽更新、录入预览和调试反馈三类职责。
 const processMouseMove = (event: MouseEvent) => {
   if (!container.value) return
 

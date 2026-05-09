@@ -405,23 +405,27 @@ const openInEditor = (item: FeaturedScore) => {
 
 .hero {
   @apply rounded-2xl p-6 md:p-8 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4;
-  background: linear-gradient(135deg, #0f766e 0%, #115e59 35%, #164e63 100%);
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
 }
 
 .hero-content {
-  @apply md:col-span-2 text-white;
+  @apply md:col-span-2;
 }
 
 .hero-kicker {
-  @apply text-xs uppercase tracking-[0.2em] text-teal-200 mb-2;
+  @apply text-xs uppercase tracking-[0.2em] mb-2;
+  color: #0f766e;
 }
 
 .hero-title {
   @apply text-3xl md:text-4xl font-bold mb-2;
+  color: #0f172a;
 }
 
 .hero-desc {
-  @apply text-sm md:text-base text-teal-100;
+  @apply text-sm md:text-base;
+  color: #334155;
 }
 
 .hero-stats {
@@ -429,7 +433,10 @@ const openInEditor = (item: FeaturedScore) => {
 }
 
 .stat-card {
-  @apply rounded-xl p-3 border border-white/20 bg-white/10 text-white;
+  @apply rounded-xl p-3 border;
+  border-color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.86);
+  color: #0f172a;
 }
 
 .stat-value {
@@ -437,7 +444,8 @@ const openInEditor = (item: FeaturedScore) => {
 }
 
 .stat-label {
-  @apply text-xs text-teal-100 mt-1;
+  @apply text-xs mt-1;
+  color: #64748b;
 }
 
 .score-section {
@@ -461,7 +469,14 @@ const openInEditor = (item: FeaturedScore) => {
 }
 
 .score-card {
-  @apply rounded-xl border border-slate-200 p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all;
+  @apply rounded-xl border border-slate-200 p-4 transition-all;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.score-card:hover {
+  border-color: #99f6e4;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.08);
 }
 
 .score-head {
@@ -497,6 +512,11 @@ const openInEditor = (item: FeaturedScore) => {
 }
 
 .open-btn {
-  @apply mt-4 w-full rounded-lg py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 transition-colors;
+  @apply mt-4 w-full rounded-lg py-2 text-sm font-medium text-white transition-colors;
+  background: #0284c7;
+}
+
+.open-btn:hover {
+  background: #0369a1;
 }
 </style>

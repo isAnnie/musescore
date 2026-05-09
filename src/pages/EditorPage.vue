@@ -62,7 +62,7 @@
             </div>
           </div>
 
-          <div v-if="showFestivalSection" class="festival-section">
+          <!-- <div v-if="showFestivalSection" class="festival-section">
             <div class="festival-header">
               <div class="festival-icon">✦</div>
               <h4 class="festival-title">活动推荐</h4>
@@ -72,7 +72,7 @@
               <button class="festival-btn" @click="createFestivalScore('节庆序曲')">节庆传统音乐</button>
               <button class="festival-btn" @click="joinFestivalContest">参加创作大赛</button>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>

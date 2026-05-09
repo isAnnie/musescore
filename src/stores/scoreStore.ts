@@ -149,6 +149,8 @@ export const useScoreStore = defineStore('score', () => {
     return (numerator * 4) / denominator
   }
 
+  // 导入 MusicXML 时，先把“小节 + 拍点 + 谱表”换算成编辑器内部二维坐标，
+  // 这样导入后的乐谱可以直接复用现有画布渲染与编辑逻辑。
   const toEditorPosition = (
     measureIndex: number,
     beatInMeasure: number,
@@ -661,6 +663,8 @@ export const useScoreStore = defineStore('score', () => {
   }
 
   // 保存到历史记录
+  // 每次编辑都保存一份深拷贝快照，避免响应式对象继续变化时污染旧历史。
+  // 这样撤销/重做恢复的是当时那一刻的完整乐谱状态。
   const saveToHistory = () => {
     if (currentScore.value) {
       // 移除当前索引之后的历史

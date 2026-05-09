@@ -13,16 +13,15 @@
           
           <!-- 右 -->
           <div class="flex items-center space-x-4">
-            <button class="hover:text-blue-300" @click="toggleTheme">
+            <button @click="toggleTheme">
               <Moon class="w-4 h-4" v-if="theme === 'light'" />
               <Sun class="w-4 h-4" v-else />
             </button>
-            <a href="#" class="hover:text-blue-300">语言</a>
+            <a href="#">语言</a>
             <span class="text-gray-400">|</span>
             <button 
               v-if="!userStore.isLoggedIn"
               @click="showLoginModal = true"
-              class="hover:text-blue-300"
             >
               登录/注册
             </button>
@@ -32,7 +31,7 @@
                 @mouseenter="handleUserMenuMouseEnter"
                 @mouseleave="handleUserMenuMouseLeave"
               >
-                <button class="flex items-center space-x-2 hover:text-blue-300" @click.stop="toggleUserMenu">
+                <button class="flex items-center space-x-2" @click.stop="toggleUserMenu">
                   <User class="w-4 h-4" />
                   <span>{{ userStore.user?.username }}</span>
                   <ChevronDown class="w-3 h-3" />
@@ -422,10 +421,27 @@ const logout = () => {
 <style scoped>
 .header {
   @apply sticky top-0 z-50;
+  color: var(--text-body);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .top-bar {
   @apply py-1 px-4;
+  background: #0f172a !important;
+  color: #f8fafc;
+}
+
+.top-bar button,
+.top-bar a {
+  border-radius: 8px;
+  padding: 4px 6px;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.top-bar button:hover,
+.top-bar a:hover {
+  background: rgba(239, 246, 255, 0.1);
+  color: #7dd3fc !important;
 }
 
 .logo-icon {
@@ -439,8 +455,12 @@ const logout = () => {
 
 .search-input {
   @apply w-full pl-10 pr-4 py-2 border rounded-lg 
-         focus:outline-none focus:ring-2 focus:ring-blue-500 
-         focus:border-transparent bg-gray-50;
+         focus:outline-none focus:ring-2
+         focus:border-transparent;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  --tw-ring-color: rgba(14, 165, 233, 0.22);
 }
 
 .search-icon {
@@ -454,13 +474,18 @@ const logout = () => {
 }
 
 .suggestion-item {
-  @apply px-4 py-3 hover:bg-gray-50 cursor-pointer border-b 
+  @apply px-4 py-3 cursor-pointer border-b 
          last:border-b-0 transition-colors;
 }
 
+.suggestion-item:hover {
+  background: #eff6ff;
+}
+
 .suggestion-type {
-  @apply inline-block px-2 py-1 bg-blue-100 text-blue-700 
-         text-xs rounded mr-3;
+  @apply inline-block px-2 py-1 text-xs rounded mr-3;
+  background: #dbeafe;
+  color: #0284c7;
 }
 
 .suggestion-title {
@@ -473,12 +498,17 @@ const logout = () => {
 
 /* 按钮样式 */
 .btn-primary {
-  @apply px-4 py-2 bg-blue-500 text-white rounded-lg 
-         hover:bg-blue-600 transition-colors font-medium;
+  @apply px-4 py-2 text-white rounded-lg transition-colors font-medium;
+  background: #0284c7;
+  box-shadow: 0 8px 18px rgba(2, 132, 199, 0.18);
+}
+
+.btn-primary:hover {
+  background: #0369a1;
 }
 
 .icon-btn {
-  @apply p-2 rounded-full hover:bg-gray-100 transition-colors 
+  @apply p-2 rounded-full transition-colors 
          relative;
 }
 
@@ -492,6 +522,7 @@ const logout = () => {
 .notifications-panel {
   @apply absolute right-0 top-full mt-2 w-80 bg-white 
          border rounded-lg shadow-lg z-50;
+  border-color: #e2e8f0;
 }
 
 .notifications-header {
@@ -507,16 +538,21 @@ const logout = () => {
 }
 
 .notification-item {
-  @apply px-4 py-3 border-b hover:bg-gray-50;
+  @apply px-4 py-3 border-b;
+}
+
+.notification-item:hover {
+  background: #eff6ff;
 }
 
 .notification-item.unread {
-  @apply bg-blue-50;
+  background: #eff6ff;
 }
 
 .notification-avatar {
-  @apply w-8 h-8 bg-blue-100 rounded-full flex items-center 
-         justify-center text-blue-600 mr-3;
+  @apply w-8 h-8 rounded-full flex items-center justify-center mr-3;
+  background: #dbeafe;
+  color: #0284c7;
 }
 
 .notification-content {
@@ -536,17 +572,19 @@ const logout = () => {
 }
 
 .view-all {
-  @apply text-blue-500 hover:text-blue-600 text-sm;
+  @apply text-sm;
+  color: #0284c7;
 }
 
 /* 更多菜单 */
 .more-menu {
   @apply absolute right-0 top-full mt-2 w-48 bg-white border 
          rounded-lg shadow-lg z-50;
+  border-color: #e2e8f0;
 }
 
 .menu-item {
-  @apply flex items-center space-x-2 px-4 py-2 hover:bg-gray-50 
+  @apply flex items-center space-x-2 px-4 py-2
          transition-colors;
 }
 
@@ -554,24 +592,50 @@ const logout = () => {
 .user-dropdown {
   @apply absolute right-0 top-full mt-0 w-48 bg-white border text-gray-700
          rounded-lg shadow-lg z-50 py-2;
+  border-color: #e2e8f0;
 }
 
 .dropdown-item {
-  @apply flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-50 
+  @apply flex items-center space-x-2 px-4 py-2 text-gray-700
          transition-colors text-sm;
 }
 
 /* 导航项样式 */
 .nav-item {
-  @apply flex items-center py-3 px-2 text-gray-600 hover:text-blue-500 
-         border-b-2 border-transparent hover:border-blue-500 transition-colors;
+  @apply flex items-center py-3 px-2 border-b-2 border-transparent transition-colors;
+  color: #475569;
+}
+
+.nav-item:hover {
+  color: #0284c7;
+  border-color: #0284c7;
 }
 
 .nav-item-active {
-  @apply text-blue-600 border-blue-600 font-medium;
+  @apply font-medium;
+  color: #0284c7;
+  border-color: #0284c7;
 }
 
 .sub-nav {
   @apply shadow-sm;
+}
+
+.main-nav,
+.sub-nav {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: #e2e8f0;
+  backdrop-filter: blur(14px);
+}
+
+.icon-btn {
+  color: #334155;
+}
+
+.icon-btn:hover,
+.dropdown-item:hover,
+.menu-item:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 </style>

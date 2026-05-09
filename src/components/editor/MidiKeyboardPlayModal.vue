@@ -102,6 +102,7 @@ const SEMITONE_MAP: Record<string, number> = {
 
 const BLACK_SEMITONES = new Set([1, 3, 6, 8, 10])
 
+// 将音高字符串（如 "C4"）转换为 MIDI 编号
 const pitchToMidi = (pitch: string) => {
   const match = pitch.match(/^([A-Ga-g])([#b]?)(-?\d)$/)
   if (!match) return null
@@ -115,6 +116,7 @@ const pitchToMidi = (pitch: string) => {
 
 const keyRange = computed(() => ({ min: 21, max: 108 }))
 
+// 计算键盘布局，包括每个键的位置、宽度和标签
 const keyLayout = computed(() => {
   const keys: Array<{ midi: number; isBlack: boolean; left: number; width: number; label: string }> = []
   const whites: number[] = []
@@ -160,6 +162,7 @@ const keyMap = computed(() => {
   return map
 })
 
+// 准备事件数据，将音高转换为 MIDI 并计算位置和尺寸
 const preparedEvents = computed(() => {
   return props.events
     .map((event) => {
@@ -198,6 +201,7 @@ const hitLineY = WATERFALL_HEIGHT - 6
 
 const currentSec = computed(() => (Number.isFinite(props.currentTime) ? props.currentTime : 0))
 
+// 将字符串哈希为无符号整数，用于生成种子
 const hashString = (value: string) => {
   let hash = 0
   for (let i = 0; i < value.length; i += 1) {
@@ -206,6 +210,7 @@ const hashString = (value: string) => {
   return hash >>> 0
 }
 
+// 基于种子的伪随机数生成器，返回 [0, 1) 范围的浮点数
 const random01FromSeed = (seed: number) => {
   let t = seed + 0x6d2b79f5
   t = Math.imul(t ^ (t >>> 15), t | 1)
@@ -213,6 +218,7 @@ const random01FromSeed = (seed: number) => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
+// 计算可见的瀑布音符，基于当前时间和位置
 const visibleWaterfallNotes = computed(() => {
   const current = currentSec.value
   return preparedEvents.value
@@ -237,6 +243,7 @@ const visibleWaterfallNotes = computed(() => {
     .filter((item): item is { id: string; style: Record<string, string> } => item !== null)
 })
 
+// 计算冲击粒子效果，为每个活跃音符生成多个粒子
 const impactParticles = computed(() => {
   const current = currentSec.value
   const particles: Array<{ id: string; style: Record<string, string> }> = []
@@ -296,6 +303,7 @@ const impactParticles = computed(() => {
   return particles
 })
 
+// 计算接触发光效果，为活跃音符添加光晕
 const contactGlows = computed(() => {
   const current = currentSec.value
   return preparedEvents.value
@@ -322,6 +330,7 @@ const contactGlows = computed(() => {
     .filter((item): item is { id: string; style: Record<string, string> } => item !== null)
 })
 
+// 计算当前活跃的 MIDI 键集合，用于高亮显示
 const activeMidiSet = computed(() => {
   const current = currentSec.value
   const set = new Set<number>()
@@ -333,6 +342,7 @@ const activeMidiSet = computed(() => {
   return set
 })
 
+// 同步面板宽度以适应容器大小
 const syncPanelWidth = () => {
   const nextWidth = Math.max(320, Math.round(keyboardAreaRef.value?.clientWidth || PANEL_WIDTH))
   if (nextWidth !== panelWidth.value) {

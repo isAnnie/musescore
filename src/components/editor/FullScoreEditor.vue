@@ -289,6 +289,8 @@ const roundToBeatSnap = (value: number) => {
   return Math.round(value / snap) * snap
 }
 
+// 以“小节 + 谱表 + 拍点列”为单位统计已占用时值。
+// 同拍和弦只共享一个时间列，因此这里按列取最大时值，避免把和弦误判为超拍。
 const canInsertNoteInMeasure = (
   noteDraft: Pick<Note, 'duration' | 'measureIndex' | 'beatInMeasure' | 'clef'>,
   excludeNoteId?: string
@@ -310,13 +312,16 @@ const canInsertNoteInMeasure = (
   measureNotes.forEach((note) => {
     if (typeof note.beatInMeasure !== 'number') return
     const beat = Number(note.beatInMeasure.toFixed(3))
+    // 同拍可能有多个和弦音，这里只记录该拍点真正占用的最长时值。
     columnDurations.set(beat, Math.max(columnDurations.get(beat) ?? 0, note.duration))
   })
 
   const targetBeat = Number(noteDraft.beatInMeasure.toFixed(3))
+  // 如果目标拍点已有音符，则继续沿用该拍点里最长的占用时值。
   const nextDuration = Math.max(columnDurations.get(targetBeat) ?? 0, noteDraft.duration)
   columnDurations.set(targetBeat, nextDuration)
 
+  // 各拍点占用时值求和后，只要不超过拍号总容量就允许写入。
   const usedBeats = Array.from(columnDurations.values()).reduce((sum, duration) => sum + duration, 0)
   return usedBeats <= beatsPerMeasure + 0.001
 }
@@ -325,6 +330,8 @@ let isRecalculatingRests = false
 let restRecalcTimer: ReturnType<typeof setTimeout> | null = null
 const REST_RECALC_DEBOUNCE_MS = 180
 
+// 编辑动作完成后重算已有休止符，保证谱面空白与真实音符占用保持一致。
+// 被真实音符占掉的休止符会删除，仍然需要保留的休止符会按下一个拍点重新计算时值。
 const recalculateExistingRests = () => {
   if (!currentScore.value || isRecalculatingRests) return
 
@@ -362,11 +369,13 @@ const recalculateExistingRests = () => {
         })
 
         if (hasPlayableNoteAtSameBeat) {
+          // 该拍已有真实音符时，这个休止符只是旧占位数据，应当被清掉。
           removals.push(restNote.id)
           return
         }
 
         const nextBeat = beatPoints.find((beat) => beat > startBeat + 0.001)
+        // 休止符默认延续到下一个拍点；如果后面没有音符，则补到小节末尾。
         const endBeat = typeof nextBeat === 'number' ? nextBeat : beatsPerMeasure
         const rawDuration = Math.max(0, endBeat - startBeat)
         if (rawDuration <= 0.001) {
@@ -375,6 +384,7 @@ const recalculateExistingRests = () => {
         }
 
         const minDuration = beatSnap.value || 0.25
+        // 休止符时值也遵循当前吸附粒度，避免出现不受编辑网格控制的碎片时值。
         const snappedDuration = Math.max(minDuration, roundToBeatSnap(rawDuration))
 
         if (Math.abs((restNote.duration || 0) - snappedDuration) > 0.001) {
@@ -426,6 +436,8 @@ const currentPosition = computed(() => {
   return { x: 0, y: 0 } // 根据实际光标位置更新
 })
 
+// 将编辑器中的结构化音符统一转换为播放时间线。
+// 优先使用 measureIndex + beatInMeasure；缺失时再退回到按列顺序推断的节拍结果。
 const buildTimelineNoteEvents = (): TimelineNoteEvent[] => {
   const beatsPerMeasure = getBeatsPerMeasureForPlayback()
   const timelineColumns = getTimelineColumns(notes.value)
@@ -503,7 +515,7 @@ const handleCanvasClick = (position: {
   }
 }
 
-// 在指定位置添加音符
+// 把画布点击结果补全为 Note 模型，后续渲染、保存、播放都基于这份结构化数据。
 const addNoteAtPosition = (position: {
   x: number
   y: number
@@ -537,7 +549,7 @@ const addNoteAtPosition = (position: {
     note.articulation = selectedArticulation.value
   }
 
-  // 如果是和弦模式，添加到当前选中音符的和弦中
+  // 和弦模式不会新开时间列，而是复用当前选中音的拍点与谱表。
   if (currentTool.value === 'chord' && selectedNote.value && !selectedNote.value.isRest) {
     const chordNote = { ...note }
     chordNote.position.x = selectedNote.value.position.x
@@ -560,7 +572,7 @@ const addNoteAtPosition = (position: {
   }
 }
 
-// 音符移动处理
+// 拖拽时同步更新视觉坐标和乐理坐标，保证移动后的音符仍可参与节奏校验与播放。
 const handleNoteMove = (
   noteId: string,
   newPosition: {
@@ -945,6 +957,7 @@ const scheduleNotesForPlayback = () => {
   ;(piano as any).releaseAll?.()
 
   type PedalSegment = { startBeat: number; endBeat: number }
+  // 播放层直接复用编辑器时间线，确保“看到的谱面”和“听到的结果”一致。
   const noteEvents = buildTimelineNoteEvents()
 
   const pedalSegments: PedalSegment[] = []
@@ -953,11 +966,13 @@ const scheduleNotesForPlayback = () => {
   noteEvents.forEach(({ note, startBeat }) => {
       if (note.pedalStart) {
         if (activePedalStart !== null) {
+          // 连续遇到 pedalStart 时，先把前一段补齐到当前起点，避免区间丢失。
           pedalSegments.push({ startBeat: activePedalStart, endBeat: startBeat })
         }
         activePedalStart = startBeat
       }
       if (note.pedalEnd && activePedalStart !== null) {
+        // pedalEnd 以当前音所在拍点作为释放位置。
         pedalSegments.push({ startBeat: activePedalStart, endBeat: startBeat })
         activePedalStart = null
       }
@@ -968,6 +983,7 @@ const scheduleNotesForPlayback = () => {
     pedalSegments.push({ startBeat: activePedalStart, endBeat: lastEndBeat })
   }
 
+  // 简化踏板模型：先整理 Pedal 区间，再把落在区间内的音符结束点延长到踏板释放位置。
   const sortedPedalSegments = pedalSegments
     .filter((segment) => segment.endBeat > segment.startBeat)
     .sort((a, b) => a.startBeat - b.startBeat)
@@ -996,6 +1012,7 @@ const scheduleNotesForPlayback = () => {
         break
       }
       if (effectiveEndBeat >= segment.startBeat - 0.001 && effectiveEndBeat < segment.endBeat) {
+        // 音符尾部一旦落入踏板区间，就把结束点延长到该区间的释放位置。
         effectiveEndBeat = Math.max(effectiveEndBeat, segment.endBeat)
       }
     }
@@ -1004,6 +1021,7 @@ const scheduleNotesForPlayback = () => {
     const velocity = (note.velocity ?? 82) / 127
     const finalDurationBeat = Math.max(0.001, effectiveEndBeat - startBeat)
 
+    // 颤音不直接按整段时值触发，而是切成多个短片段重复触发来模拟快速敲击。
     if (note.articulation === 'tremolo') {
       let cursor = startBeat
       while (cursor < effectiveEndBeat - 0.0001) {
@@ -1063,7 +1081,7 @@ const startMetronome = () => {
   metronomeLoop.start(0)
 }
 
-// 音高计算
+// 根据五线谱纵坐标反推出最接近的音高，用于点击录入与拖拽后的音高更新。
 const calculatePitchFromPosition = (y: number): string => {
   const staffTop = 40
   const rowHeight = 150

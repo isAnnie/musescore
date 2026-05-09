@@ -680,7 +680,13 @@ const importResource = (resource: ResourceItem) => {
 }
 
 .resource-card {
-  @apply rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-md;
+  @apply rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition-all;
+}
+
+.resource-card:hover {
+  border-color: #99f6e4;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.08);
 }
 
 .resource-card-head {
@@ -795,10 +801,20 @@ const importResource = (resource: ResourceItem) => {
 }
 
 .btn-primary {
-  @apply bg-cyan-700 text-white hover:bg-cyan-800;
+  @apply text-white;
+  background: #0284c7;
+}
+
+.btn-primary:hover {
+  background: #0369a1;
 }
 
 .btn-secondary {
-  @apply bg-slate-100 text-slate-700 hover:bg-slate-200;
+  @apply text-slate-700;
+  background: #e2e8f0;
+}
+
+.btn-secondary:hover {
+  background: #cbd5e1;
 }
 </style>

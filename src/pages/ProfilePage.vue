@@ -606,18 +606,28 @@ onMounted(async () => {
   cursor: pointer;
 }
 
+.range-switch button:hover {
+  background: #eff6ff;
+  color: #0284c7;
+}
+
 .range-switch button.active {
-  background: #0f766e;
+  background: #0284c7;
   color: #ffffff;
 }
 
 .refresh-btn {
   border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
+  background: #e2e8f0;
+  color: #0f172a;
   border-radius: 10px;
   padding: 8px 12px;
   cursor: pointer;
+}
+
+.refresh-btn:hover {
+  border-color: #cbd5e1;
+  background: #cbd5e1;
 }
 
 .refresh-btn:disabled {
@@ -723,7 +733,7 @@ onMounted(async () => {
 }
 
 .bar-fill.spread {
-  background: linear-gradient(90deg, #22c55e, #16a34a);
+  background: linear-gradient(90deg, #14b8a6, #0f766e);
 }
 
 .bar-fill.community {
@@ -773,20 +783,32 @@ onMounted(async () => {
 }
 
 .action-btn.edit {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.action-btn.edit:hover {
+  background: #0369a1;
 }
 
 .action-btn.remove {
-  background: #fee2e2;
-  color: #dc2626;
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.action-btn.remove:hover {
+  background: #c2410c;
 }
 
 .create-btn {
   margin-top: 12px;
   width: 100%;
-  background: #2563eb;
+  background: #0284c7;
   color: #ffffff;
+}
+
+.create-btn:hover {
+  background: #0369a1;
 }
 
 .error-text {

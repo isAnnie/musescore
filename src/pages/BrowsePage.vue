@@ -79,8 +79,7 @@
 
     <section v-if="userStore.isLoggedIn" class="card">
       <div class="card-head">
-        <h2>我的数据库乐谱（发布管理）</h2>
-        <p>以下为你已保存到数据库的乐谱，可一键发布、下架，或返回编辑器继续修改。</p>
+        <h2>我的乐谱</h2>
       </div>
 
       <div v-if="myScores.length === 0" class="empty-hint">
@@ -411,6 +410,13 @@ onMounted(() => {
   background: #ffffff;
 }
 
+.search-input:focus,
+.sort-select:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14);
+}
+
 .card {
   margin-top: 14px;
   background: #ffffff;
@@ -420,8 +426,8 @@ onMounted(() => {
 }
 
 .recommend-card {
-  border-color: #99f6e4;
-  background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 }
 
 .card-head h2 {
@@ -450,6 +456,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.score-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 10px 24px rgba(2, 132, 199, 0.07);
 }
 
 .score-card.mine {
@@ -458,8 +470,8 @@ onMounted(() => {
 }
 
 .score-card.recommend {
-  border-color: #99f6e4;
-  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
 }
 
 .recommend-title-row {
@@ -472,8 +484,8 @@ onMounted(() => {
 .recommend-badge {
   flex-shrink: 0;
   border-radius: 9999px;
-  background: #ccfbf1;
-  color: #0f766e;
+  background: #dbeafe;
+  color: #0284c7;
   font-size: 12px;
   font-weight: 700;
   padding: 4px 10px;
@@ -481,7 +493,7 @@ onMounted(() => {
 
 .recommend-reason {
   margin-top: 8px;
-  color: #0f766e;
+  color: #0369a1;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -523,14 +535,26 @@ onMounted(() => {
   color: #ffffff;
 }
 
+.btn-primary:hover {
+  background: #0369a1;
+}
+
 .btn-warning {
   background: #ea580c;
   color: #ffffff;
 }
 
+.btn-warning:hover {
+  background: #c2410c;
+}
+
 .btn-secondary {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+.btn-secondary:hover {
+  background: #cbd5e1;
 }
 
 .empty-hint {
@@ -582,5 +606,9 @@ onMounted(() => {
   border: 0;
   background: #e2e8f0;
   cursor: pointer;
+}
+
+.close-btn:hover {
+  background: #cbd5e1;
 }
 </style>

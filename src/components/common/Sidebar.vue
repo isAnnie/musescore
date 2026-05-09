@@ -349,15 +349,20 @@ onMounted(() => {
 
 <style scoped>
 .sidebar {
-  @apply w-64 bg-white border-r h-full overflow-y-auto 
+  @apply w-64 border-r h-full overflow-y-auto 
          flex flex-col space-y-6 p-4;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #e2e8f0;
+  color: #334155;
+  backdrop-filter: blur(14px);
   min-height: calc(100vh - 64px); /* 减去Header高度 */
 }
 
 /* 用户卡片样式 */
 .user-card {
-  @apply bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 
-         border border-blue-100;
+  @apply rounded-xl p-4 border;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+  border-color: #bfdbfe;
 }
 
 .user-avatar {
@@ -403,13 +408,20 @@ onMounted(() => {
 }
 
 .menu-item {
-  @apply flex items-center space-x-3 px-3 py-2 rounded-lg 
-         text-gray-700 hover:bg-gray-100 hover:text-blue-600 
-         transition-colors mb-1 relative;
+  @apply flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 relative;
+  color: #334155;
+}
+
+.menu-item:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 .menu-item.active {
-  @apply bg-blue-50 text-blue-600 font-medium;
+  @apply font-medium;
+  background: #eff6ff;
+  color: #0284c7;
+  box-shadow: inset 3px 0 0 #0284c7;
 }
 
 .menu-item svg {
@@ -417,13 +429,14 @@ onMounted(() => {
 }
 
 .menu-item.active svg {
-  @apply text-blue-500;
+  color: #0284c7;
 }
 
 /* 徽章样式 */
 .badge {
-  @apply absolute right-3 px-2 py-1 bg-blue-100 text-blue-600 
-         text-xs rounded-full;
+  @apply absolute right-3 px-2 py-1 text-xs rounded-full;
+  background: #ccfbf1;
+  color: #0f766e;
 }
 
 .badge-live {
@@ -432,8 +445,9 @@ onMounted(() => {
 
 /* 节日特辑 */
 .festival-section {
-  @apply bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 
-         rounded-xl p-4 mb-6;
+  @apply rounded-xl p-4 mb-6;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
 }
 
 .festival-header {
@@ -441,12 +455,19 @@ onMounted(() => {
 }
 
 .festival-title {
-  @apply font-semibold text-yellow-800;
+  @apply font-semibold;
+  color: #0f172a;
 }
 
 .festival-item {
-  @apply bg-white bg-opacity-50 border border-yellow-200 
-         hover:bg-yellow-50 hover:border-yellow-300;
+  @apply bg-white bg-opacity-50 border;
+  border-color: #e2e8f0;
+}
+
+.festival-item:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 .festival-icon {
@@ -455,7 +476,9 @@ onMounted(() => {
 
 /* 快速操作 */
 .quick-actions {
-  @apply border border-gray-200 rounded-xl p-4 mb-6;
+  @apply border rounded-xl p-4 mb-6;
+  border-color: #e2e8f0;
+  background: #ffffff;
 }
 
 .quick-actions-title {
@@ -463,14 +486,21 @@ onMounted(() => {
 }
 
 .quick-action-btn {
-  @apply w-full flex items-center space-x-3 px-3 py-2 rounded-lg 
-         bg-gray-50 hover:bg-gray-100 text-gray-700 mb-2 
-         transition-colors;
+  @apply w-full flex items-center space-x-3 px-3 py-2 rounded-lg mb-2 transition-colors;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.quick-action-btn:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 /* 最近访问 */
 .recent-visited {
-  @apply border border-gray-200 rounded-xl p-4;
+  @apply border rounded-xl p-4;
+  border-color: #e2e8f0;
+  background: #ffffff;
 }
 
 .recent-header {
@@ -482,7 +512,12 @@ onMounted(() => {
 }
 
 .clear-btn {
-  @apply p-1 rounded hover:bg-gray-100 transition-colors;
+  @apply p-1 rounded transition-colors;
+}
+
+.clear-btn:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 .recent-list {
@@ -491,12 +526,21 @@ onMounted(() => {
 
 .recent-item {
   @apply flex items-center space-x-3 p-2 rounded-lg 
-         hover:bg-gray-50 cursor-pointer transition-colors;
+         cursor-pointer transition-colors;
+}
+
+.recent-item:hover {
+  background: #eff6ff;
 }
 
 .recent-icon {
   @apply w-8 h-8 bg-gray-100 rounded-lg flex items-center 
          justify-center text-gray-600;
+}
+
+.recent-item:hover .recent-icon {
+  background: #dbeafe;
+  color: #0284c7;
 }
 
 .recent-content {
@@ -517,8 +561,13 @@ onMounted(() => {
 }
 
 .footer-link {
-  @apply flex items-center space-x-2 px-2 py-1.5 text-gray-600 
-         hover:text-blue-600 hover:bg-gray-50 rounded transition-colors;
+  @apply flex items-center space-x-2 px-2 py-1.5 rounded transition-colors;
+  color: #475569;
+}
+
+.footer-link:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 .theme-toggle {
@@ -526,9 +575,13 @@ onMounted(() => {
 }
 
 .theme-btn {
-  @apply flex items-center space-x-2 px-2 py-1.5 text-gray-600 
-         hover:text-blue-600 hover:bg-gray-50 rounded transition-colors 
-         w-full;
+  @apply flex items-center space-x-2 px-2 py-1.5 rounded transition-colors w-full;
+  color: #475569;
+}
+
+.theme-btn:hover {
+  background: #eff6ff;
+  color: #0284c7;
 }
 
 /* 暗色模式支持 */
@@ -545,22 +598,35 @@ onMounted(() => {
 }
 
 .dark .menu-item {
-  @apply text-gray-300 hover:bg-gray-800 hover:text-blue-400;
+  @apply text-gray-300;
+}
+
+.dark .menu-item:hover {
+  background: rgba(239, 246, 255, 0.1);
+  color: #7dd3fc;
 }
 
 .dark .menu-item.active {
-  @apply bg-blue-900 bg-opacity-30 text-blue-400;
+  background: rgba(2, 132, 199, 0.22);
+  color: #7dd3fc;
 }
 
 .dark .festival-section {
-  @apply from-yellow-900 to-orange-900 border-yellow-800;
+  border-color: rgba(125, 211, 252, 0.24);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(8, 47, 73, 0.72));
 }
 
 .dark .festival-title {
-  @apply text-yellow-200;
+  color: #e0f2fe;
 }
 
 .dark .festival-item {
-  @apply bg-gray-800 bg-opacity-50 border-yellow-800 hover:bg-yellow-900;
+  border-color: rgba(125, 211, 252, 0.2);
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.dark .festival-item:hover {
+  background: rgba(239, 246, 255, 0.1);
+  color: #7dd3fc;
 }
 </style>

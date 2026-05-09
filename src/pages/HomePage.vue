@@ -152,3 +152,70 @@ const formatDate = (date: Date) => {
   })
 }
 </script>
+
+<style scoped>
+.home-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 14px 40px;
+}
+
+.festival-banner > div {
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%) !important;
+  color: #0f172a !important;
+  box-shadow: var(--shadow-card);
+}
+
+.festival-banner p {
+  color: #334155;
+}
+
+.bg-white.rounded-xl,
+.bg-white.rounded-lg {
+  border: 1px solid #e2e8f0;
+  box-shadow: none !important;
+}
+
+.bg-white.rounded-xl {
+  border-radius: 14px;
+}
+
+.bg-white.rounded-lg {
+  border-radius: 12px;
+}
+
+h3 {
+  color: #0f172a;
+}
+
+button.bg-blue-600 {
+  background: #0284c7 !important;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+button.bg-blue-600:hover {
+  background: #0369a1 !important;
+}
+
+button.border {
+  border-color: #cbd5e1 !important;
+  background: #e2e8f0;
+  color: #0f172a;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+button.border:hover {
+  background: #cbd5e1 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.cursor-pointer:hover {
+  background: #f0fdfa !important;
+  border-color: #99f6e4;
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.08) !important;
+}
+</style>

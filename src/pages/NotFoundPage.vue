@@ -62,6 +62,27 @@ const goBack = () => {
 
 <style scoped>
 .not-found-page {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+  color: #0f172a;
+}
+
+.not-found-page > div {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-card);
+}
+
+.not-found-page button.bg-blue-600 {
+  background: #0284c7 !important;
+}
+
+.not-found-page button.bg-blue-600:hover {
+  background: #0369a1 !important;
+}
+
+.not-found-page .text-blue-500,
+.not-found-page .text-blue-600 {
+  color: #0284c7 !important;
 }
 </style>

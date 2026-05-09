@@ -512,8 +512,9 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: 12px;
-  background: linear-gradient(135deg, #0f172a 0%, #134e4a 100%);
-  color: #f8fafc;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%);
+  color: #0f172a;
   border-radius: 16px;
   padding: 18px;
 }
@@ -521,7 +522,7 @@ onMounted(() => {
 .hero-kicker {
   font-size: 12px;
   letter-spacing: 0.14em;
-  color: #99f6e4;
+  color: #0f766e;
 }
 
 .hero h1 {
@@ -533,7 +534,7 @@ onMounted(() => {
 .hero-desc {
   margin-top: 10px;
   max-width: 720px;
-  color: #d1fae5;
+  color: #334155;
 }
 
 .hero-metrics {
@@ -543,10 +544,10 @@ onMounted(() => {
 }
 
 .metric-card {
-  border: 1px solid rgba(255, 255, 255, 0.26);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .metric-value {
@@ -557,7 +558,7 @@ onMounted(() => {
 .metric-label {
   margin-top: 4px;
   font-size: 12px;
-  color: #ccfbf1;
+  color: #64748b;
 }
 
 .error-banner {
@@ -584,9 +585,15 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.tab-btn:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0284c7;
+}
+
 .tab-btn.active {
-  background: #0f766e;
-  border-color: #0f766e;
+  background: #0284c7;
+  border-color: #0284c7;
   color: #ffffff;
 }
 
@@ -641,13 +648,13 @@ onMounted(() => {
 }
 
 .upload-card:hover {
-  border-color: #14b8a6;
-  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.08);
+  border-color: #93c5fd;
+  box-shadow: 0 8px 22px rgba(2, 132, 199, 0.08);
 }
 
 .upload-card.has-file {
-  border-color: #14b8a6;
-  background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%);
+  border-color: #93c5fd;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
 }
 
 .upload-title {
@@ -669,10 +676,10 @@ onMounted(() => {
   width: fit-content;
   align-items: center;
   justify-content: center;
-  border: 1px solid #99f6e4;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
-  background: #f0fdfa;
-  color: #0f766e;
+  background: #eff6ff;
+  color: #0284c7;
   font-size: 13px;
   font-weight: 700;
   padding: 7px 12px;
@@ -680,7 +687,7 @@ onMounted(() => {
 }
 
 .upload-trigger:hover {
-  background: #ccfbf1;
+  background: #dbeafe;
 }
 
 .upload-meta {
@@ -696,7 +703,7 @@ onMounted(() => {
   border: 1px solid #bfdbfe;
   border-radius: 999px;
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #0284c7;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -727,6 +734,11 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.item:hover {
+  border-color: #99f6e4;
 }
 
 .item-head {
@@ -814,8 +826,8 @@ onMounted(() => {
 }
 
 .answer-item.accepted {
-  border-color: #16a34a;
-  background: #f0fdf4;
+  border-color: #99f6e4;
+  background: #f0fdfa;
 }
 
 .answer-editor {
@@ -854,8 +866,12 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: #0f766e;
+  background: #0284c7;
   color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #0369a1;
 }
 
 .btn-secondary {
@@ -863,14 +879,26 @@ onMounted(() => {
   color: #0f172a;
 }
 
+.btn-secondary:hover {
+  background: #cbd5e1;
+}
+
 .btn-success {
-  background: #16a34a;
+  background: #0284c7;
   color: #ffffff;
 }
 
+.btn-success:hover {
+  background: #0369a1;
+}
+
 .btn-warning {
-  background: #f59e0b;
+  background: #ea580c;
   color: #ffffff;
+}
+
+.btn-warning:hover {
+  background: #c2410c;
 }
 
 @media (max-width: 900px) {
