@@ -43,7 +43,7 @@
       <button @click="$emit('toggle-metronome')" :class="['control-btn', { active: metronomeActive }]">Metro</button>
     </div>
 
-    <div class="action-buttons">
+    <!-- <div class="action-buttons">
       <button @click="$emit('save')" class="action-btn save-btn">保存</button>
       <button type="button" @click.stop="$emit('toggle-auto-save')" class="action-btn">
         自动保存：{{ autoSaveEnabled ? '开' : '关' }}
@@ -83,7 +83,7 @@
 
       <button @click="shareScore" class="action-btn">分享</button>
       <button @click="printScore" class="action-btn">打印</button>
-    </div>
+    </div> -->
   </div>
 </template>
 

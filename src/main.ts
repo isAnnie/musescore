@@ -37,9 +37,10 @@ const featuredRedirectPaths = ['/features', '/pricing', '/festival/music']
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    redirect: '/editor',
     component: MainLayout,
     children: [
-      { path: '', name: 'home', component: HomePage },
+      { path: 'home', name: 'home', component: HomePage },
       { path: 'browse', name: 'browse', component: BrowsePage },
       { path: 'featured', name: 'featured', component: FeaturedPage },
       { path: 'resource-templates', name: 'resource-templates', component: ResourceTemplatesPage },

@@ -148,7 +148,7 @@ const showFestivalSection = computed(() => {
 
 onMounted(() => {
   if (scoreId.value) {
-    loadScore(scoreId.value)
+    // loadScore(scoreId.value)
   } else {
     enterCreateMode()
   }
@@ -165,7 +165,7 @@ watch(
   (newId) => {
     editorContextVersion.value += 1
     if (typeof newId === 'string' && newId.length > 0) {
-      loadScore(newId)
+      // loadScore(newId)
       return
     }
     enterCreateMode()
@@ -320,7 +320,7 @@ const scheduleAutoSave = (delay = AUTO_SAVE_DELAY_MS) => {
   clearAutoSaveTimer()
   autoSaveTimer.value = setTimeout(() => {
     autoSaveTimer.value = null
-    void persistScore()
+    // void persistScore()
   }, delay)
 }
 
@@ -352,7 +352,7 @@ const loadScore = async (id: string) => {
 
 const retryLoading = () => {
   if (!scoreId.value) return
-  loadScore(scoreId.value)
+  // loadScore(scoreId.value)
 }
 
 const navigateToScore = (id: string) => {
@@ -439,7 +439,7 @@ const handleSave = async () => {
     return
   }
   clearAutoSaveTimer()
-  await persistScore({ showSuccessMessage: '保存成功' })
+  // await persistScore({ showSuccessMessage: '保存成功' })
 }
 
 const toggleAutoSave = () => {
@@ -466,7 +466,7 @@ const handlePublish = async (payload: PublishPayload) => {
     currentScore.value.description = payload.description
     currentScore.value.tags = payload.tags
     currentScore.value.updatedAt = new Date()
-    await persistScore({ showSuccessMessage: '发布成功' })
+    // await persistScore({ showSuccessMessage: '发布成功' })
   } catch (err) {
     console.error('发布作品失败:', err)
     error.value = err instanceof Error ? err.message : '发布作品失败'

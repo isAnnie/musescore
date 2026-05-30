@@ -9,9 +9,9 @@
       minHeight: `${contentHeight}px`
     }"
   >
-    <button class="debug-toggle" @click.stop="showDebugLayer = !showDebugLayer">
+    <!-- <button class="debug-toggle" @click.stop="showDebugLayer = !showDebugLayer">
       {{ showDebugLayer ? '隐藏调试' : '显示调试' }}
-    </button>
+    </button> -->
 
     <div
       v-if="highlightedMeasureStyle"
@@ -596,7 +596,6 @@ const drawScore = () => {
   const pageMeasureCount = rowsPerPage * measuresPerRow
 
   let measureCount = Math.max(pageMeasureCount, usedMeasureCount)
-  // If notes already occupy the last measure of the current page, pre-render one more page.
   if (usedMeasureCount > 0 && usedMeasureCount % pageMeasureCount === 0) {
     measureCount += pageMeasureCount
   }

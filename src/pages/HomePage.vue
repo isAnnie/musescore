@@ -155,7 +155,7 @@ const formatDate = (date: Date) => {
 
 <style scoped>
 .home-page {
-  max-width: 1180px;
+  /* max-width: 1180px; */
   margin: 0 auto;
   padding: 22px 14px 40px;
 }

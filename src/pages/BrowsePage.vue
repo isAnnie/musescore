@@ -370,7 +370,7 @@ onMounted(() => {
 
 <style scoped>
 .publish-page {
-  max-width: 1180px;
+  /* max-width: 1180px; */
   margin: 0 auto;
   padding: 22px 14px 40px;
 }
