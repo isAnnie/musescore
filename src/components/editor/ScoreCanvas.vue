@@ -435,9 +435,13 @@ const resolveStemDirection = (staveNote: StaveNote) => {
   return averageLine >= 3 ? Stem.DOWN : Stem.UP
 }
 
-const applyStemDirection = (note: Pick<Note, 'type' | 'isRest'>, staveNote: StaveNote) => {
+const applyStemDirection = (
+  note: Pick<Note, 'type' | 'isRest'>,
+  staveNote: StaveNote,
+  forcedDirection?: number
+) => {
   if (note.isRest || note.type === 'whole') return
-  staveNote.setStemDirection(resolveStemDirection(staveNote))
+  staveNote.setStemDirection(forcedDirection ?? resolveStemDirection(staveNote))
 }
 
 const addArticulationMark = (note: Pick<Note, 'isRest' | 'articulation'>, staveNote: StaveNote) => {
@@ -458,14 +462,14 @@ const addArticulationMark = (note: Pick<Note, 'isRest' | 'articulation'>, staveN
 
 // 单音渲染入口：把内部 Note 模型转换为 VexFlow 的 StaveNote，
 // 并统一挂载升降号、附点、踏板标记、演奏法标记与选中态。
-const createVexNote = (note: Note | TickableNote) => {
+const createVexNote = (note: Note | TickableNote, stemDirection?: number) => {
   const clef = (note as Note).clef ?? 'treble'
   const staveNote = new StaveNote({
     clef,
     keys: [note.isRest ? 'b/4' : normalizePitch(note.pitch)],
     duration: getVexDuration(note)
   })
-  applyStemDirection(note, staveNote)
+  applyStemDirection(note, staveNote, stemDirection)
 
   const fullNote = note as Note
 
@@ -506,7 +510,7 @@ const createVexNote = (note: Note | TickableNote) => {
 
 // 和弦的多个音头必须落在同一个 StaveNote 中，
 // 所以这里先排序，再把每个音的修饰符映射到对应 keyIndex。
-const createVexChordNote = (chordNotes: Note[]) => {
+const createVexChordNote = (chordNotes: Note[], stemDirection?: number) => {
   const sorted = [...chordNotes].sort((a, b) => b.position.y - a.position.y)
   const headNote = sorted[0]
   const keys = sorted.map((note) => normalizePitch(note.pitch))
@@ -517,7 +521,7 @@ const createVexChordNote = (chordNotes: Note[]) => {
     keys,
     duration: getVexDuration(headNote)
   })
-  applyStemDirection(headNote, staveNote)
+  applyStemDirection(headNote, staveNote, stemDirection)
 
   sorted.forEach((note, index) => {
     const symbol = accidentalToSymbol(note.accidental)
@@ -674,9 +678,35 @@ const drawScore = () => {
       }
 
       const voices: Voice[] = []
-      const vexNotesAll: StaveNote[] = []
+      const beamSources: Array<{
+        tickables: Array<StaveNote | GhostNote>
+        stemDirection?: number
+      }> = []
 
-      byVoice.forEach((voiceItems) => {
+      const voiceEntries = Array.from(byVoice.entries())
+      const forcedStemDirectionByVoice = new Map<string, number>()
+      if (voiceEntries.length > 1) {
+        const voicesByHeight = voiceEntries
+          .map(([voiceId, voiceItems]) => {
+            const playableItems = voiceItems.filter((item) => !item.note.isRest)
+            const averageY = playableItems.length > 0
+              ? playableItems.reduce((sum, item) => sum + item.note.position.y, 0) / playableItems.length
+              : Number.POSITIVE_INFINITY
+            return { voiceId, averageY }
+          })
+          .sort((a, b) => {
+            if (Math.abs(a.averageY - b.averageY) > 0.001) return a.averageY - b.averageY
+            return a.voiceId.localeCompare(b.voiceId, undefined, { numeric: true })
+          })
+
+        const upperVoiceCount = Math.ceil(voicesByHeight.length / 2)
+        voicesByHeight.forEach(({ voiceId }, index) => {
+          forcedStemDirectionByVoice.set(voiceId, index < upperVoiceCount ? Stem.UP : Stem.DOWN)
+        })
+      }
+
+      voiceEntries.forEach(([voiceId, voiceItems]) => {
+        const forcedStemDirection = forcedStemDirectionByVoice.get(voiceId)
         const sortedVoiceItems = [...voiceItems].sort((a, b) => {
           const beatDiff = a.beat - b.beat
           if (Math.abs(beatDiff) > 0.001) return beatDiff
@@ -684,7 +714,6 @@ const drawScore = () => {
         })
 
         const voiceTickables: Array<StaveNote | GhostNote> = []
-        const renderedStaveNotes: StaveNote[] = []
         let cursorBeat = 0
         let index = 0
 
@@ -698,9 +727,8 @@ const drawScore = () => {
           }
 
           if (currentItem.note.isRest) {
-            const staveNote = createVexNote({ ...currentItem.note, clef })
+            const staveNote = createVexNote({ ...currentItem.note, clef }, forcedStemDirection)
             voiceTickables.push(staveNote)
-            renderedStaveNotes.push(staveNote)
             vexNoteById.set(currentItem.note.id, { staveNote, keyIndex: 0 })
             cursorBeat = Math.max(cursorBeat, currentItem.beat + currentDuration)
             index += 1
@@ -721,16 +749,14 @@ const drawScore = () => {
           }
 
           if (chordNotes.length > 1) {
-            const { staveNote, sortedNotes } = createVexChordNote(chordNotes)
+            const { staveNote, sortedNotes } = createVexChordNote(chordNotes, forcedStemDirection)
             voiceTickables.push(staveNote)
-            renderedStaveNotes.push(staveNote)
             sortedNotes.forEach((note, keyIndex) => {
               vexNoteById.set(note.id, { staveNote, keyIndex })
             })
           } else {
-            const staveNote = createVexNote(chordNotes[0])
+            const staveNote = createVexNote(chordNotes[0], forcedStemDirection)
             voiceTickables.push(staveNote)
-            renderedStaveNotes.push(staveNote)
             vexNoteById.set(chordNotes[0].id, { staveNote, keyIndex: 0 })
           }
 
@@ -746,10 +772,13 @@ const drawScore = () => {
         voice.setStrict(false)
         voice.addTickables(voiceTickables)
         voices.push(voice)
-        vexNotesAll.push(...renderedStaveNotes)
+        beamSources.push({
+          tickables: voiceTickables,
+          stemDirection: forcedStemDirection
+        })
       })
 
-      return { voices, vexNotesAll }
+      return { voices, beamSources }
     }
 
     const trebleVoiceData = buildClefVoiceData('treble')
@@ -759,8 +788,21 @@ const drawScore = () => {
     formatter.joinVoices(trebleVoiceData.voices).formatToStave(trebleVoiceData.voices, trebleStave)
     formatter.joinVoices(bassVoiceData.voices).formatToStave(bassVoiceData.voices, bassStave)
 
-    const trebleBeams = Beam.generateBeams(trebleVoiceData.vexNotesAll.filter((note) => !note.isRest?.()))
-    const bassBeams = Beam.generateBeams(bassVoiceData.vexNotesAll.filter((note) => !note.isRest?.()))
+    const beamGroups = Beam.getDefaultBeamGroups(
+      `${props.timeSignature?.numerator ?? 4}/${props.timeSignature?.denominator ?? 4}`
+    )
+    const createVoiceBeams = (
+      beamSources: Array<{ tickables: Array<StaveNote | GhostNote>; stemDirection?: number }>
+    ) => {
+      return beamSources.flatMap(({ tickables, stemDirection }) => Beam.generateBeams(tickables, {
+        groups: beamGroups,
+        beamRests: false,
+        maintainStemDirections: stemDirection !== undefined,
+        stemDirection
+      }))
+    }
+    const trebleBeams = createVoiceBeams(trebleVoiceData.beamSources)
+    const bassBeams = createVoiceBeams(bassVoiceData.beamSources)
 
     trebleVoiceData.voices.forEach((voice) => {
       voice.draw(context, trebleStave)
