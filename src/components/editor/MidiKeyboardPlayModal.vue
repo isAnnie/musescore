@@ -10,7 +10,6 @@
       </div>
 
       <div class="waterfall-area">
-        <div class="waterfall-glow"></div>
         <div class="hit-line"></div>
 
         <div
@@ -393,15 +392,7 @@ onBeforeUnmount(() => {
 .waterfall-area {
   @apply relative overflow-hidden;
   height: 600px;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(16, 185, 129, 0.2), transparent 40%),
-    radial-gradient(circle at 80% 5%, rgba(59, 130, 246, 0.24), transparent 42%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(3, 7, 18, 0.95));
-}
-
-.waterfall-glow {
-  @apply absolute inset-0 pointer-events-none;
-  background: linear-gradient(180deg, rgba(34, 211, 238, 0.08), transparent 35%, rgba(56, 189, 248, 0.05));
+  background: #0f172a;
 }
 
 .hit-line {

@@ -127,7 +127,6 @@ import { v4 as uuidv4 } from 'uuid'
 import type { Note, Score, TimeSignature } from '@/types/score'
 import { ensureSharedPianoReady, getSharedPianoSampler, prewarmSharedPianoSampler } from '@/services/audioSampler'
 
-// 组件导入
 import EditorHeader from './EditorHeader.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import ScoreCanvas from './ScoreCanvas.vue'
