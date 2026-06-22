@@ -73,7 +73,7 @@
           :title="noteType.label"
         >
           <span class="note-icon">{{ noteType.icon }}</span>
-          <span class="note-duration">{{ noteType.duration }}拍</span>
+          <!-- <span class="note-duration">{{ noteType.duration }}拍</span> -->
         </button>
       </div>
     </div>

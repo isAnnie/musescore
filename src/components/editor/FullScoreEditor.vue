@@ -283,15 +283,10 @@ const getBeatsPerMeasure = (signature?: TimeSignature) => {
   return (numerator * 4) / denominator
 }
 
-const roundToBeatSnap = (value: number) => {
-  const snap = beatSnap.value || 0.25
-  return Math.round(value / snap) * snap
-}
-
-// 以“小节 + 谱表 + 拍点列”为单位统计已占用时值。
-// 同拍和弦只共享一个时间列，因此这里按列取最大时值，避免把和弦误判为超拍。
+// 只统计目标小节中用户实际添加的音符和休止符时值。
+// 空白拍位不占容量；同拍和弦共享一个时间列，并按其中最长时值计算。
 const canInsertNoteInMeasure = (
-  noteDraft: Pick<Note, 'duration' | 'measureIndex' | 'beatInMeasure' | 'clef'>,
+  noteDraft: Pick<Note, 'duration' | 'measureIndex' | 'beatInMeasure' | 'clef' | 'voice' | 'isRest'>,
   excludeNoteId?: string
 ) => {
   if (typeof noteDraft.measureIndex !== 'number' || typeof noteDraft.beatInMeasure !== 'number') {
@@ -299,120 +294,48 @@ const canInsertNoteInMeasure = (
   }
 
   const beatsPerMeasure = getBeatsPerMeasure(currentScore.value?.timeSignature)
+  const targetMeasureIndex = Math.max(0, Math.floor(noteDraft.measureIndex))
   const targetClef = noteDraft.clef ?? 'treble'
+  const targetVoice = noteDraft.voice?.trim() || '1'
   const measureNotes = notes.value.filter((note) => {
-    if (note.measureIndex !== noteDraft.measureIndex) return false
+    if (typeof note.measureIndex !== 'number') return false
+    if (Math.max(0, Math.floor(note.measureIndex)) !== targetMeasureIndex) return false
     if ((note.clef ?? 'treble') !== targetClef) return false
+    if ((note.voice?.trim() || '1') !== targetVoice) return false
     if (excludeNoteId && note.id === excludeNoteId) return false
     return true
   })
-  const columnDurations = new Map<number, number>()
+  const columns = new Map<number, { duration: number; count: number; hasRest: boolean }>()
 
   measureNotes.forEach((note) => {
     if (typeof note.beatInMeasure !== 'number') return
     const beat = Number(note.beatInMeasure.toFixed(3))
-    // 同拍可能有多个和弦音，这里只记录该拍点真正占用的最长时值。
-    columnDurations.set(beat, Math.max(columnDurations.get(beat) ?? 0, note.duration))
+    const column = columns.get(beat) ?? { duration: 0, count: 0, hasRest: false }
+    column.duration = Math.max(column.duration, Math.max(0, note.duration))
+    column.count += 1
+    column.hasRest ||= !!note.isRest
+    columns.set(beat, column)
   })
 
   const targetBeat = Number(noteDraft.beatInMeasure.toFixed(3))
-  // 如果目标拍点已有音符，则继续沿用该拍点里最长的占用时值。
-  const nextDuration = Math.max(columnDurations.get(targetBeat) ?? 0, noteDraft.duration)
-  columnDurations.set(targetBeat, nextDuration)
+  const targetColumn = columns.get(targetBeat) ?? { duration: 0, count: 0, hasRest: false }
+  // 休止符不能与同拍的音符或另一个休止符叠放；只有非休止符之间可以组成和弦。
+  if (targetColumn.count > 0 && (targetColumn.hasRest || noteDraft.isRest)) {
+    return false
+  }
+  targetColumn.duration = Math.max(targetColumn.duration, Math.max(0, noteDraft.duration))
+  targetColumn.count += 1
+  targetColumn.hasRest ||= !!noteDraft.isRest
+  columns.set(targetBeat, targetColumn)
 
-  // 各拍点占用时值求和后，只要不超过拍号总容量就允许写入。
-  const usedBeats = Array.from(columnDurations.values()).reduce((sum, duration) => sum + duration, 0)
-  return usedBeats <= beatsPerMeasure + 0.001
-}
-
-let isRecalculatingRests = false
-let restRecalcTimer: ReturnType<typeof setTimeout> | null = null
-const REST_RECALC_DEBOUNCE_MS = 180
-
-// 编辑动作完成后重算已有休止符，保证谱面空白与真实音符占用保持一致。
-// 被真实音符占掉的休止符会删除，仍然需要保留的休止符会按下一个拍点重新计算时值。
-const recalculateExistingRests = () => {
-  if (!currentScore.value || isRecalculatingRests) return
-
-  const beatsPerMeasure = getBeatsPerMeasure(currentScore.value.timeSignature)
-  const updates: Array<{ id: string; duration: number }> = []
-  const removals: string[] = []
-  const measureMap = new Map<string, Note[]>()
-
-  notes.value.forEach((note) => {
-    if (typeof note.measureIndex !== 'number' || typeof note.beatInMeasure !== 'number') return
-    const clef = note.clef ?? 'treble'
-    const key = `${note.measureIndex}:${clef}`
-    const list = measureMap.get(key) ?? []
-    list.push(note)
-    measureMap.set(key, list)
-  })
-
-  measureMap.forEach((measureNotes) => {
-    const beatPoints = Array.from(new Set(
-      measureNotes
-        .map((note) => note.beatInMeasure)
-        .filter((beat): beat is number => typeof beat === 'number')
-        .map((beat) => Number(beat.toFixed(3)))
-    )).sort((a, b) => a - b)
-
-    measureNotes
-      .filter((note) => note.isRest && typeof note.beatInMeasure === 'number')
-      .forEach((restNote) => {
-        const startBeat = Number(restNote.beatInMeasure!.toFixed(3))
-        const hasPlayableNoteAtSameBeat = measureNotes.some((note) => {
-          if (note.id === restNote.id) return false
-          if (note.isRest) return false
-          if (typeof note.beatInMeasure !== 'number') return false
-          return Math.abs(Number(note.beatInMeasure.toFixed(3)) - startBeat) <= 0.001
-        })
-
-        if (hasPlayableNoteAtSameBeat) {
-          // 该拍已有真实音符时，这个休止符只是旧占位数据，应当被清掉。
-          removals.push(restNote.id)
-          return
-        }
-
-        const nextBeat = beatPoints.find((beat) => beat > startBeat + 0.001)
-        // 休止符默认延续到下一个拍点；如果后面没有音符，则补到小节末尾。
-        const endBeat = typeof nextBeat === 'number' ? nextBeat : beatsPerMeasure
-        const rawDuration = Math.max(0, endBeat - startBeat)
-        if (rawDuration <= 0.001) {
-          removals.push(restNote.id)
-          return
-        }
-
-        const minDuration = beatSnap.value || 0.25
-        // 休止符时值也遵循当前吸附粒度，避免出现不受编辑网格控制的碎片时值。
-        const snappedDuration = Math.max(minDuration, roundToBeatSnap(rawDuration))
-
-        if (Math.abs((restNote.duration || 0) - snappedDuration) > 0.001) {
-          updates.push({ id: restNote.id, duration: snappedDuration })
-        }
-      })
-  })
-
-  if (updates.length === 0 && removals.length === 0) return
-
-  isRecalculatingRests = true
-  removals.forEach((id) => {
-    scoreStore.removeNote(id)
-  })
-  updates.forEach((item) => {
-    scoreStore.updateNote(item.id, { duration: item.duration })
-  })
-  isRecalculatingRests = false
-}
-
-const scheduleRestRecalculation = () => {
-  if (restRecalcTimer) {
-    clearTimeout(restRecalcTimer)
+  let usedBeats = 0
+  for (const column of columns.values()) {
+    if (column.hasRest && column.count > 1) return false
+    if (column.duration <= 0) return false
+    usedBeats += column.duration
   }
 
-  restRecalcTimer = setTimeout(() => {
-    restRecalcTimer = null
-    recalculateExistingRests()
-  }, REST_RECALC_DEBOUNCE_MS)
+  return usedBeats <= beatsPerMeasure + 0.001
 }
 
 const totalDuration = computed(() => {
@@ -555,6 +478,7 @@ const addNoteAtPosition = (position: {
     chordNote.clef = selectedNote.value.clef ?? note.clef
     chordNote.measureIndex = selectedNote.value.measureIndex
     chordNote.beatInMeasure = selectedNote.value.beatInMeasure
+    chordNote.voice = selectedNote.value.voice
     if (!canInsertNoteInMeasure(chordNote)) {
       console.warn('该小节音符时值已满，无法继续添加。')
       return
@@ -585,18 +509,18 @@ const handleNoteMove = (
 ) => {
   const note = notes.value.find(n => n.id === noteId)
   if (note) {
-    if (
-      typeof newPosition.measureIndex === 'number'
-      && typeof newPosition.beatInMeasure === 'number'
-      && (newPosition.measureIndex !== note.measureIndex || newPosition.beatInMeasure !== note.beatInMeasure)
-      && !canInsertNoteInMeasure({
+    if (typeof newPosition.measureIndex === 'number' && typeof newPosition.beatInMeasure === 'number') {
+      const movedNote = {
         duration: note.duration,
         clef: newPosition.clef ?? note.clef ?? 'treble',
         measureIndex: newPosition.measureIndex,
-        beatInMeasure: newPosition.beatInMeasure
-      }, note.id)
-    ) {
-      return
+        beatInMeasure: newPosition.beatInMeasure,
+        voice: note.voice,
+        isRest: note.isRest
+      }
+      if (!canInsertNoteInMeasure(movedNote, note.id)) {
+        return
+      }
     }
 
     scoreStore.updateNote(noteId, {
@@ -641,6 +565,10 @@ const updateSelectedNote = (updates: Partial<Note>) => {
   if (!selectedNote.value) return
   
   const updatedNote = { ...selectedNote.value, ...updates }
+  if (!canInsertNoteInMeasure(updatedNote, selectedNote.value.id)) {
+    console.warn('修改后的音符或休止符超出当前小节时值。')
+    return
+  }
   scoreStore.updateNote(selectedNote.value.id, updatedNote)
 }
 
@@ -1143,10 +1071,6 @@ onUnmounted(() => {
   stopPlayback()
   document.removeEventListener('keydown', handleKeyDown)
   clearPlaybackEndEvent()
-  if (restRecalcTimer) {
-    clearTimeout(restRecalcTimer)
-    restRecalcTimer = null
-  }
 
   metronomeSynth?.dispose()
   metronomeLoop?.dispose()
@@ -1234,14 +1158,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break
   }
 }
-
-watch(
-  () => [notes.value, currentScore.value?.timeSignature],
-  () => {
-    scheduleRestRecalculation()
-  },
-  { deep: true }
-)
 
 watch(
   () => currentScore.value?.tempo,

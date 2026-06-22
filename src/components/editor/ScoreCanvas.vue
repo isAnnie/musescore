@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Accidental, Annotation, Beam, Dot, Formatter, Renderer, Stave, StaveConnector, StaveNote, StaveTie, Stem, Voice } from 'vexflow'
+import { Accidental, Annotation, Beam, Dot, Formatter, GhostNote, Renderer, Stave, StaveConnector, StaveNote, StaveTie, Stem, Voice } from 'vexflow'
 import type { Note, TimeSignature } from '@/types/score'
 
 const props = withDefaults(defineProps<{
@@ -555,22 +555,23 @@ const createVexChordNote = (chordNotes: Note[]) => {
   return { staveNote, sortedNotes: sorted }
 }
 
-const makeRestTickables = (gapBeats: number, clef: 'treble' | 'bass'): TickableNote[] => {
+// 用不可见的节拍占位符保留用户点击的时间位置，不生成或显示休止符。
+const makeGhostTickables = (gapBeats: number): GhostNote[] => {
   const beatSnap = getBeatSnapValue()
-  const tickables: TickableNote[] = []
+  const tickables: GhostNote[] = []
   let remaining = Math.round(gapBeats / beatSnap) * beatSnap
+  const vexDurationByType: Record<Note['type'], string> = {
+    whole: 'w',
+    half: 'h',
+    quarter: 'q',
+    eighth: '8',
+    sixteenth: '16'
+  }
 
   while (remaining > 0.001) {
     const segment = typeByDuration.find((item) => item.duration <= remaining + 0.001)
     if (!segment) break
-
-    tickables.push({
-      type: segment.type,
-      isRest: true,
-      pitch: 'B4',
-      clef
-    })
-
+    tickables.push(new GhostNote(vexDurationByType[segment.type]))
     remaining -= segment.duration
   }
 
@@ -580,7 +581,7 @@ const makeRestTickables = (gapBeats: number, clef: 'treble' | 'bass'): TickableN
 // 乐谱总渲染流程：
 // 1. 计算每个音符所属的小节、拍点和谱表；
 // 2. 按行构建大谱表；
-// 3. 按声部/拍点组织 VexFlow 音符并自动补足休止符；
+// 3. 按声部/拍点组织 VexFlow 音符，并用不可见占位符保留空白拍位；
 // 4. 最后补绘连音线、踏板线、选中态与播放高亮。
 const drawScore = () => {
   if (!vfHost.value || !container.value) return
@@ -682,7 +683,8 @@ const drawScore = () => {
           return a.note.position.y - b.note.position.y
         })
 
-        const vexNotes: StaveNote[] = []
+        const voiceTickables: Array<StaveNote | GhostNote> = []
+        const renderedStaveNotes: StaveNote[] = []
         let cursorBeat = 0
         let index = 0
 
@@ -691,15 +693,15 @@ const drawScore = () => {
           const currentDuration = currentItem.note.duration || getDurationFromType(currentItem.note.type)
 
           if (currentItem.beat > cursorBeat + 0.001) {
-            // 当前拍点前有空白时，自动补足休止符，保证每个声部的小节时值完整。
-            makeRestTickables(currentItem.beat - cursorBeat, clef).forEach((rest) => {
-              vexNotes.push(createVexNote(rest))
-            })
+            voiceTickables.push(...makeGhostTickables(currentItem.beat - cursorBeat))
             cursorBeat = currentItem.beat
           }
 
           if (currentItem.note.isRest) {
-            vexNotes.push(createVexNote({ ...currentItem.note, clef }))
+            const staveNote = createVexNote({ ...currentItem.note, clef })
+            voiceTickables.push(staveNote)
+            renderedStaveNotes.push(staveNote)
+            vexNoteById.set(currentItem.note.id, { staveNote, keyIndex: 0 })
             cursorBeat = Math.max(cursorBeat, currentItem.beat + currentDuration)
             index += 1
             continue
@@ -720,13 +722,15 @@ const drawScore = () => {
 
           if (chordNotes.length > 1) {
             const { staveNote, sortedNotes } = createVexChordNote(chordNotes)
-            vexNotes.push(staveNote)
+            voiceTickables.push(staveNote)
+            renderedStaveNotes.push(staveNote)
             sortedNotes.forEach((note, keyIndex) => {
               vexNoteById.set(note.id, { staveNote, keyIndex })
             })
           } else {
             const staveNote = createVexNote(chordNotes[0])
-            vexNotes.push(staveNote)
+            voiceTickables.push(staveNote)
+            renderedStaveNotes.push(staveNote)
             vexNoteById.set(chordNotes[0].id, { staveNote, keyIndex: 0 })
           }
 
@@ -735,17 +739,14 @@ const drawScore = () => {
         }
 
         if (cursorBeat < beatsPerMeasure - 0.001) {
-          // 声部结尾没写满一小节时，也要自动补尾部休止符以满足 VexFlow 节拍要求。
-          makeRestTickables(beatsPerMeasure - cursorBeat, clef).forEach((rest) => {
-            vexNotes.push(createVexNote(rest))
-          })
+          voiceTickables.push(...makeGhostTickables(beatsPerMeasure - cursorBeat))
         }
 
         const voice = new Voice({ num_beats: beatsPerMeasure, beat_value: 4 })
         voice.setStrict(false)
-        voice.addTickables(vexNotes)
+        voice.addTickables(voiceTickables)
         voices.push(voice)
-        vexNotesAll.push(...vexNotes)
+        vexNotesAll.push(...renderedStaveNotes)
       })
 
       return { voices, vexNotesAll }
