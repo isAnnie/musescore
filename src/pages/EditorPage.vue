@@ -49,10 +49,14 @@
               <p class="card-desc">MIDI / MusicXML / MXL</p>
             </div>
 
-            <div class="quick-start-card" @click="createTemplateScore">
-              <div class="card-icon">◎</div>
-              <h4 class="card-title">使用模板</h4>
-              <p class="card-desc">快速开始</p>
+            <div
+              class="quick-start-card"
+              :class="{ active: showAuditionList }"
+              @click="showAuditionList = !showAuditionList"
+            >
+              <div class="card-icon">▶</div>
+              <h4 class="card-title">试听</h4>
+              <p class="card-desc">浏览并导入示例乐谱</p>
             </div>
 
             <div class="quick-start-card" @click="openRecentScore">
@@ -61,6 +65,42 @@
               <p class="card-desc">继续创作</p>
             </div>
           </div>
+
+          <Transition name="audition-list">
+            <section v-if="showAuditionList" class="audition-panel">
+              <div class="audition-header">
+                <div class="audition-heading">
+                  <h4 class="audition-title">试听曲目</h4>
+                  <p class="audition-description">选择 MXL 乐谱导入编辑器后即可播放试听</p>
+                </div>
+                <span class="audition-count">{{ auditionScores.length }} 首</span>
+              </div>
+
+              <div v-if="auditionScores.length" class="audition-grid">
+                <article
+                  v-for="(score, index) in auditionScores"
+                  :key="score.fileName"
+                  class="audition-item"
+                >
+                  <div class="audition-index">{{ String(index + 1).padStart(2, '0') }}</div>
+                  <div class="audition-info">
+                    <h5 class="audition-score-title">{{ score.title }}</h5>
+                    <p class="audition-file-name">{{ score.fileName }}</p>
+                  </div>
+                  <button
+                    class="audition-import-btn"
+                    type="button"
+                    :disabled="importingAuditionFile === score.fileName"
+                    @click.stop="importAuditionScore(score)"
+                  >
+                    {{ importingAuditionFile === score.fileName ? '导入中...' : '导入试听' }}
+                  </button>
+                </article>
+              </div>
+
+              <p v-else class="audition-empty">mxl 目录中暂无可用乐谱。</p>
+            </section>
+          </Transition>
 
           <!-- <div v-if="showFestivalSection" class="festival-section">
             <div class="festival-header">
@@ -94,6 +134,37 @@ type PublishPayload = {
   tags: string[]
 }
 
+type AuditionScore = {
+  fileName: string
+  title: string
+  url: string
+}
+
+const auditionModules = import.meta.glob('../../mxl/*.mxl', {
+  eager: true,
+  query: '?url',
+  import: 'default'
+}) as Record<string, string>
+
+const auditionTitleOverrides: Record<string, string> = {
+  'waltz-in-a-minorchopin.mxl': '肖邦：A 小调圆舞曲',
+  'frederic-chopin-etude-in-c-sharp-minor-op10-no4-torrent.mxl': '肖邦：升 C 小调练习曲 Op.10 No.4',
+  'f-chopin-polonaise-in-a-flat-major-op-53-heroic.mxl': '肖邦：降 A 大调波兰舞曲 Op.53《英雄》',
+  'chopin-etude-op10-no12-in-c-minor-revolutionary.mxl': '肖邦：C 小调练习曲 Op.10 No.12《革命》'
+}
+
+const formatAuditionTitle = (fileName: string) => {
+  const overridden = auditionTitleOverrides[fileName.toLowerCase()]
+  if (overridden) return overridden
+
+  return fileName
+    .replace(/\.mxl$/i, '')
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 const route = useRoute()
 const router = useRouter()
 const scoreStore = useScoreStore()
@@ -112,6 +183,19 @@ const isSyncingFromServer = ref(false)
 const lastSavedFingerprint = ref<string | null>(null)
 const editorContextVersion = ref(0)
 const autoSaveLoginHintShown = ref(false)
+const showAuditionList = ref(false)
+const importingAuditionFile = ref<string | null>(null)
+
+const auditionScores = Object.entries(auditionModules)
+  .map(([path, url]): AuditionScore => {
+    const fileName = path.split('/').pop() ?? 'score.mxl'
+    return {
+      fileName,
+      title: formatAuditionTitle(fileName),
+      url
+    }
+  })
+  .sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'))
 
 const AUTO_SAVE_DELAY_MS = 1200
 const LOGIN_HINT_COOLDOWN_MS = 2000
@@ -393,10 +477,6 @@ const createFestivalScore = (title: string) => {
   scoreStore.currentScore.keySignature = 'F'
 }
 
-const createTemplateScore = () => {
-  createBlankScore()
-}
-
 const openRecentScore = () => {
   const recent = scoreStore.recentScores[0]
   if (!recent) return
@@ -430,6 +510,36 @@ const importFromFile = () => {
     }
   }
   input.click()
+}
+
+const importAuditionScore = async (score: AuditionScore) => {
+  if (importingAuditionFile.value) return
+
+  importingAuditionFile.value = score.fileName
+  error.value = null
+  try {
+    const response = await fetch(score.url)
+    if (!response.ok) {
+      throw new Error(`无法读取试听文件：${score.fileName}`)
+    }
+
+    const file = new File(
+      [await response.blob()],
+      score.fileName,
+      { type: 'application/vnd.recordare.musicxml' }
+    )
+    const imported = await scoreStore.importScoreFile(file)
+    initialized.value = true
+    hasUnsavedChanges.value = true
+    lastSavedFingerprint.value = null
+    scheduleAutoSave()
+    navigateToScore(imported.id)
+  } catch (err) {
+    console.error('试听乐谱导入失败:', err)
+    error.value = err instanceof Error ? err.message : '试听乐谱导入失败'
+  } finally {
+    importingAuditionFile.value = null
+  }
 }
 
 const handleSave = async () => {
@@ -626,6 +736,10 @@ const showSaveSuccess = (message = '保存成功') => {
   @apply p-6 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer;
 }
 
+.quick-start-card.active {
+  @apply border-blue-400 bg-blue-50 shadow-md;
+}
+
 .card-icon {
   @apply text-3xl mb-3;
 }
@@ -636,6 +750,73 @@ const showSaveSuccess = (message = '保存成功') => {
 
 .card-desc {
   @apply text-sm text-gray-600;
+}
+
+.audition-panel {
+  @apply mb-10 overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-lg;
+}
+
+.audition-header {
+  @apply flex items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4;
+}
+
+.audition-heading {
+  @apply min-w-0;
+}
+
+.audition-title {
+  @apply text-xl font-semibold text-slate-800;
+}
+
+.audition-description {
+  @apply mt-1 text-sm text-slate-500;
+}
+
+.audition-count {
+  @apply shrink-0 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700;
+}
+
+.audition-grid {
+  @apply grid grid-cols-1 gap-px bg-slate-200 md:grid-cols-2;
+}
+
+.audition-item {
+  @apply flex items-center gap-4 bg-white px-5 py-4 transition-colors hover:bg-blue-50;
+}
+
+.audition-index {
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500;
+}
+
+.audition-info {
+  @apply min-w-0 flex-1;
+}
+
+.audition-score-title {
+  @apply truncate font-semibold text-slate-800;
+}
+
+.audition-file-name {
+  @apply mt-1 truncate text-xs text-slate-400;
+}
+
+.audition-import-btn {
+  @apply shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-wait disabled:bg-blue-300;
+}
+
+.audition-empty {
+  @apply px-6 py-10 text-center text-sm text-slate-500;
+}
+
+.audition-list-enter-active,
+.audition-list-leave-active {
+  transition: all 0.2s ease;
+}
+
+.audition-list-enter-from,
+.audition-list-leave-to {
+  transform: translateY(-8px);
+  opacity: 0;
 }
 
 .festival-section {
